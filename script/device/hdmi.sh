@@ -3,8 +3,8 @@
 . /opt/muos/script/var/func.sh
 
 REFRESH_HDMI() {
-	printf "1" >"/tmp/hdmi_do_refresh"
-	printf "%s" "$1" >"/tmp/hdmi_in_use"
+	printf "1" >"$MUOS_RUN_DIR/hdmi_refresh"
+	printf "%s" "$1" >"$MUOS_RUN_DIR/hdmi_mode"
 }
 
 SET_DISPLAY_PARAMS() {

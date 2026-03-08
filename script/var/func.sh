@@ -324,7 +324,7 @@ SHOW_MESSAGE() {
 
 EXEC_MUX() {
 	if [ "$(GET_VAR "config" "boot/device_mode")" -eq 1 ]; then
-		while [ ! -f "/tmp/hdmi_in_use" ]; do sleep 0.01; done
+		while [ ! -f "$MUOS_RUN_DIR/hdmi_mode" ]; do sleep 0.01; done
 	fi
 
 	[ -f "$SAFE_QUIT" ] && rm "$SAFE_QUIT"
