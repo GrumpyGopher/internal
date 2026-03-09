@@ -220,18 +220,31 @@ EXTRACT_ARCHIVE() {
 	CACHE_ARCHIVE "$ARCHIVE_PATH" >/dev/null 2>&1 || return 1
 
 	if [ -n "$PATTERN" ]; then
-		FILE_COUNT="$(unzip -Z1 "$ARCHIVE_PATH" "$PATTERN" 2>/dev/null | grep -cv '/$')"
+		TOTAL_BYTES="$(GET_ARCHIVE_BYTES "$ARCHIVE_PATH" "${PATTERN%/*}/")"
 	else
-		FILE_COUNT="$(grep -cv '/$' "$ARCHIVE_CACHE_FILE" 2>/dev/null)"
+		TOTAL_BYTES="$(GET_ARCHIVE_BYTES "$ARCHIVE_PATH")"
 	fi
 
-	[ "${FILE_COUNT:-0}" -gt 0 ] || FILE_COUNT=1
+	[ "${TOTAL_BYTES:-0}" -gt 0 ] || TOTAL_BYTES=1
+
+	mkdir -p "$DEST_DIR"
+	printf "\nExtracting Archive: "
 
 	if [ -n "$PATTERN" ]; then
-		unzip -o "$ARCHIVE_PATH" "$PATTERN" -d "$DEST_DIR" 2>&1 | awk '/:/{print}' | /opt/muos/bin/pv -pls "$FILE_COUNT" >/dev/null
+		unzip -o "$ARCHIVE_PATH" "$PATTERN" -d "$DEST_DIR" >/dev/null &
+		PID=$!
 	else
-		unzip -o "$ARCHIVE_PATH" -d "$DEST_DIR" 2>&1 | awk '/:/{print}' | /opt/muos/bin/pv -pls "$FILE_COUNT" >/dev/null
+		unzip -o "$ARCHIVE_PATH" -d "$DEST_DIR" >/dev/null &
+		PID=$!
 	fi
+
+	while kill -0 "$PID" 2>/dev/null; do
+		printf "."
+		usleep "$THROBBER_USEC"
+	done
+
+	wait "$PID"
+	printf "\n\n"
 }
 
 CREATE_ARCHIVE() {
