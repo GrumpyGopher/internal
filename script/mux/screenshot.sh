@@ -5,13 +5,9 @@
 SS_LOCK="/tmp/screenshot.lock"
 
 if [ ! -e "$SS_LOCK" ]; then
-	RUMBLE_DEVICE="$(GET_VAR "device" "board/rumble")"
-	SCREEN_WIDTH="$(GET_VAR "device" "screen/width")"
-	SCREEN_HEIGHT="$(GET_VAR "device" "screen/height")"
-
-	RUMBLE "$RUMBLE_DEVICE" 0.3
-
 	touch "$SS_LOCK"
+
+	RUMBLE "$(GET_VAR "device" "board/rumble")" 0.3
 
 	BASE_DIR="$MUOS_STORE_DIR/screenshot"
 	CURRENT_DATE="$(date +"%Y%m%d_%H%M")"
@@ -25,9 +21,9 @@ if [ ! -e "$SS_LOCK" ]; then
 
 	# Silly 28xx...
 	case "$(GET_VAR "device" "board/name")" in
-		mgx*) fbgrab -a -w "$SCREEN_HEIGHT" -h "$SCREEN_WIDTH" -l "$SCREEN_HEIGHT" "$SS_FILE" && convert "$SS_FILE" -rotate 270 "$SS_FILE" ;;
-		rg28xx-h) fbgrab -a -w "$SCREEN_HEIGHT" -h "$SCREEN_WIDTH" -l "$SCREEN_HEIGHT" "$SS_FILE" && convert "$SS_FILE" -rotate 90 "$SS_FILE" ;;
-		*) fbgrab -a -w "$SCREEN_WIDTH" -h "$SCREEN_HEIGHT" -l "$SCREEN_WIDTH" "$SS_FILE" ;;
+		mgx*) /opt/muos/frontend/mufbset -g "$SS_FILE" && convert "$SS_FILE" -rotate 270 "$SS_FILE" ;;
+		rg28xx-h) /opt/muos/frontend/mufbset -g "$SS_FILE" && convert "$SS_FILE" -rotate 90 "$SS_FILE" ;;
+		*) /opt/muos/frontend/mufbset -g "$SS_FILE" ;;
 	esac
 
 	rm "$SS_LOCK"
