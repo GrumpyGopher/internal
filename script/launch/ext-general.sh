@@ -14,11 +14,7 @@ LOG_INFO "$0" 0 "FILE" "$FILE"
 HOME="$(GET_VAR "device" "board/home")"
 export HOME
 
-# Stage overlay currently disabled for all external content launch
-# until such time what is causing certain titles to become black
-# screen.  Most likely conflicts with the overlay rendering.
-
-# SETUP_STAGE_OVERLAY
+SETUP_STAGE_OVERLAY
 SETUP_SDL_ENVIRONMENT
 
 SET_VAR "system" "foreground_process" "external"
