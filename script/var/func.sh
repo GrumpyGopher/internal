@@ -258,11 +258,35 @@ HOTKEY() {
 	esac
 }
 
+BATTERY() {
+	case "$1" in
+		stop)
+			while pgrep -x mubattery >/dev/null; do
+				killall -9 mubattery
+				sleep 1
+			done
+			;;
+		start)
+			pgrep -x mubattery >/dev/null && return 0
+			setsid -f /opt/muos/frontend/mubattery </dev/null >/dev/null 2>&1
+			;;
+		restart)
+			BATTERY stop
+			BATTERY start
+			;;
+		*)
+			printf "Usage: BATTERY start | stop | restart\n"
+			return 1
+			;;
+	esac
+}
+
 MUXCTL() {
 	case "$1" in
 		stop)
 			HOTKEY stop
 			FRONTEND stop
+			BATTERY stop
 			;;
 		start)
 			HOTKEY start
@@ -272,6 +296,8 @@ MUXCTL() {
 			else
 				FRONTEND start
 			fi
+
+			BATTERY start
 			;;
 		restart)
 			MUXCTL stop
