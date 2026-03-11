@@ -193,6 +193,11 @@ if [ "${HAS_NETWORK:-0}" -eq 1 ] && [ "${CONNECT_ON_BOOT:-0}" -eq 1 ]; then
 	fi
 fi
 
+#:] ### Battery Watchdog
+#:] Start the battery watchdog that helps with voltage calibration.
+LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
+BATTERY start
+
 #:] ### Hotkey Daemon
 #:] Start the input listener that powers global hotkeys.
 LOG_INFO "$0" 0 "BOOTING" "Starting Hotkey Daemon"
