@@ -109,20 +109,79 @@ SETUP_STAGE_OVERLAY() {
 #:] PipeWire will handle the volume independently. Of course the TrimUI
 #:] devices works completely backwards, so that is why it is set to '0'.
 RESET_AMIXER() {
-	(
-		AUDIO_CONTROL="$(GET_VAR "device" "audio/control")"
-		MAX_VOL="$(GET_VAR "device" "audio/max")"
+	AUDIO_CONTROL=$(GET_VAR "device" "audio/control")
+	MAX_VOL=$(GET_VAR "device" "audio/max")
 
-		case "$(GET_VAR "device" "board/name")" in
-			mgx* | tui*) DEV_VOL="0" ;;
-			*) DEV_VOL="$MAX_VOL" ;;
-		esac
+	[ -n "$AUDIO_CONTROL" ] || return 1
+	[ -n "$MAX_VOL" ] || MAX_VOL=100
 
-		amixer -c 0 sset "$AUDIO_CONTROL" "${DEV_VOL}%" unmute >/dev/null 2>&1
-		amixer set "Master" unmute >/dev/null 2>&1
+	case "$(GET_VAR "device" "board/name")" in
+		mgx* | tui*) DEV_VOL=0 ;;
+		*) DEV_VOL=$MAX_VOL ;;
+	esac
 
-		wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
-	) &
+	amixer -c 0 sset "$AUDIO_CONTROL" "${DEV_VOL}%" unmute >/dev/null 2>&1
+	amixer set "Master" unmute >/dev/null 2>&1
+
+	return 0
+}
+
+WAIT_FOR_AUDIO_SINK() {
+	TIMEOUT_MS=${1:-5000}
+	INTERVAL_MS=100
+	ELAPSED=0
+
+	while [ "$ELAPSED" -lt "$TIMEOUT_MS" ]; do
+		wpctl get-volume @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && return 0
+		sleep 0.1
+		ELAPSED=$((ELAPSED + INTERVAL_MS))
+	done
+
+	return 1
+}
+
+GET_SAVED_AUDIO_VOLUME() {
+	SAVED_VOL=$(GET_VAR "config" "settings/general/volume")
+	MIN_VOL=$(GET_VAR "device" "audio/min")
+	MAX_VOL=$(GET_VAR "device" "audio/max")
+
+	[ -n "$MIN_VOL" ] || MIN_VOL=0
+	[ -n "$MAX_VOL" ] || MAX_VOL=100
+	[ -n "$SAVED_VOL" ] || SAVED_VOL=$MIN_VOL
+
+	[ "$SAVED_VOL" -lt "$MIN_VOL" ] && SAVED_VOL=$MIN_VOL
+	[ "$SAVED_VOL" -gt "$MAX_VOL" ] && SAVED_VOL=$MAX_VOL
+
+	printf "%s\n" "$SAVED_VOL"
+}
+
+SET_SAVED_AUDIO_VOLUME() {
+	VALUE=$1
+
+	MIN_VOL=$(GET_VAR "device" "audio/min")
+	MAX_VOL=$(GET_VAR "device" "audio/max")
+
+	[ -n "$MIN_VOL" ] || MIN_VOL=0
+	[ -n "$MAX_VOL" ] || MAX_VOL=100
+	[ -n "$VALUE" ] || VALUE=$MIN_VOL
+
+	[ "$VALUE" -lt "$MIN_VOL" ] && VALUE=$MIN_VOL
+	[ "$VALUE" -gt "$MAX_VOL" ] && VALUE=$MAX_VOL
+
+	SET_VAR "config" "settings/general/volume" "$VALUE"
+
+	return 0
+}
+
+RESTORE_AUDIO_VOLUME() {
+	SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME) || return 1
+
+	WAIT_FOR_AUDIO_SINK 5000 || return 1
+
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
+	/opt/muos/script/device/audio.sh "$SAVED_VOL" >/dev/null 2>&1
+
+	return 0
 }
 
 SET_DEFAULT_GOVERNOR() {

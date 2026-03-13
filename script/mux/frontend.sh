@@ -41,6 +41,9 @@ SET_DEFAULT_GOVERNOR
 if [ "$AUDIO_READY" -eq 1 ]; then
 	LOG_INFO "$0" 0 "BOOTING" "Waiting for Pipewire Init"
 	until [ "$(GET_VAR "device" "audio/ready")" -eq 1 ]; do sleep 0.1; done
+
+	LOG_INFO "$0" 0 "BOOTING" "Restoring Saved Volume"
+	RESTORE_AUDIO_VOLUME || LOG_WARN "$0" 0 "BOOTING" "Unable to restore saved volume"
 fi
 
 if [ "$SKIP" -eq 0 ]; then
@@ -60,7 +63,7 @@ LOG_INFO "$0" 0 "FRONTEND" "Starting Frontend Launcher"
 while :; do
 	# Reset audio control status
 	LOG_INFO "$0" 0 "FRONTEND" "Audio Mixer Reset"
-	RESET_AMIXER &
+	RESET_AMIXER
 
 	killall -9 "gptokeyb" "gptokeyb2" >/dev/null 2>&1
 

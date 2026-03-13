@@ -4,56 +4,88 @@
 
 DEVICE_MODE=$(GET_VAR "config" "boot/device_mode")
 AUDIO_MODE=$(GET_VAR "config" "settings/hdmi/audio")
+
 { [ -z "$1" ] || { [ "$DEVICE_MODE" -ne 0 ] && [ "$AUDIO_MODE" -eq 0 ]; }; } && exit 0
 
 MIN=$(GET_VAR "device" "audio/min")
 MAX=$(GET_VAR "device" "audio/max")
+
+[ -n "$MIN" ] || MIN=0
+[ -n "$MAX" ] || MAX=100
+
 INC=$(GET_VAR "config" "settings/advanced/incvolume")
+OVD=$(GET_VAR "config" "settings/advanced/overdrive")
+
+[ -n "$INC" ] || INC=1
+[ "$OVD" = "1" ] && MAX=200
 
 GET_CURRENT() {
-	wpctl get-volume @DEFAULT_AUDIO_SINK@ |
-		awk '{for (i=1; i<=NF; i++) if ($i ~ /^[0-9.]+$/) print int($i * 100)}'
+	wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null |
+		awk '
+			{
+				for (i = 1; i <= NF; i++) {
+					if ($i ~ /^[0-9.]+$/) {
+						print int(($i * 100) + 0.5)
+						exit
+					}
+				}
+			}
+		'
+}
+
+NORMALISE_VALUE() {
+	VALUE=$1
+
+	[ -n "$VALUE" ] || VALUE=$MIN
+	[ "$VALUE" -lt "$MIN" ] && VALUE=$MIN
+	[ "$VALUE" -gt "$MAX" ] && VALUE=$MAX
+
+	printf "%s\n" "$VALUE"
 }
 
 SET_CURRENT() {
-	MIN=$(GET_VAR "device" "audio/min")
-	MAX=$(GET_VAR "device" "audio/max")
+	VALUE=$(NORMALISE_VALUE "$1")
 
-	VALUE="$1"
+	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${VALUE}%" >/dev/null 2>&1
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
 
-	[ "$VALUE" -lt "$MIN" ] && VALUE="$MIN"
-	[ "$VALUE" -gt "$MAX" ] && VALUE="$MAX"
-
-	# Fuck you percentages!
-	PERCENTAGE=$(((VALUE - MIN) * MAX / (MAX - MIN)))
-	[ "$PERCENTAGE" -lt 0 ] && PERCENTAGE=0
-	[ "$PERCENTAGE" -gt "$MAX" ] && PERCENTAGE="$MAX"
-
-	wpctl set-volume @DEFAULT_AUDIO_SINK@ "$PERCENTAGE%"
-	SET_VAR "config" "settings/general/volume" "$VALUE"
+	SET_SAVED_AUDIO_VOLUME "$VALUE"
 }
 
 VOL_INFO() {
 	V=$(GET_CURRENT)
-
-	[ "$MAX" -le 0 ] && printf "%s (0%%)\n" "$V" && return
-
-	PCT=$(((V * 100) / MAX))
-	printf "%s (%s%%)\n" "$V" "$PCT"
+	[ -n "$V" ] || V=0
+	printf "%s%%\n" "$V"
 }
 
 case "$1" in
 	U)
-		NEW_VL=$(($(GET_CURRENT) + INC))
-		[ "$NEW_VL" -gt "$MAX" ] && NEW_VL=$MAX
+		CUR=$(GET_CURRENT)
+		[ -n "$CUR" ] || CUR=0
+
+		if [ "$MAX" -le "$MIN" ]; then
+			NEW_VL=$MIN
+		else
+			CUR_VAL=$((MIN + (CUR * (MAX - MIN) / 100)))
+			NEW_VL=$((CUR_VAL + INC))
+		fi
+
 		SET_CURRENT "$NEW_VL"
 		;;
 	D)
-		NEW_VL=$(($(GET_CURRENT) - INC))
-		[ "$NEW_VL" -lt "$MIN" ] && NEW_VL=$MIN
+		CUR=$(GET_CURRENT)
+		[ -n "$CUR" ] || CUR=0
+
+		if [ "$MAX" -le "$MIN" ]; then
+			NEW_VL=$MIN
+		else
+			CUR_VAL=$((MIN + (CUR * (MAX - MIN) / 100)))
+			NEW_VL=$((CUR_VAL - INC))
+		fi
+
 		SET_CURRENT "$NEW_VL"
 		;;
 	I) VOL_INFO ;;
-	[0-9]*) [ "$1" -eq "$1" ] 2>/dev/null && [ "$1" -ge "$MIN" ] && [ "$1" -le "$MAX" ] && SET_CURRENT "$1" ;;
+	[0-9]*) [ "$1" -eq "$1" ] 2>/dev/null && SET_CURRENT "$1" ;;
 	*) ;;
 esac
