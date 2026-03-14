@@ -118,7 +118,7 @@ if [ -n "$LAST_PLAY" ]; then
 		SET_VAR "config" "system/used_reset" 0
 
 		# Reset audio control status
-		RESET_AMIXER
+		RESET_MIXER
 
 		# Okay we're all set, time to launch whatever we were playing last
 		/opt/muos/script/mux/launch.sh

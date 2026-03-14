@@ -63,7 +63,7 @@ LOG_INFO "$0" 0 "FRONTEND" "Starting Frontend Launcher"
 while :; do
 	# Reset audio control status
 	LOG_INFO "$0" 0 "FRONTEND" "Audio Mixer Reset"
-	RESET_AMIXER
+	RESET_MIXER
 
 	killall -9 "gptokeyb" "gptokeyb2" >/dev/null 2>&1
 

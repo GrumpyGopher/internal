@@ -46,8 +46,8 @@ NORMALISE_VALUE() {
 SET_CURRENT() {
 	VALUE=$(NORMALISE_VALUE "$1")
 
-	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${VALUE}%" >/dev/null 2>&1
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
+	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${VALUE}%"
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 	SET_SAVED_AUDIO_VOLUME "$VALUE"
 }

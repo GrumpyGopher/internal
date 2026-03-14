@@ -115,7 +115,7 @@ FINALISE_AUDIO() {
 	}
 
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
-	RESET_AMIXER
+	RESET_MIXER
 
 	if [ -n "$RUNTIME_PERCENT" ]; then
 		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${RUNTIME_PERCENT}%"

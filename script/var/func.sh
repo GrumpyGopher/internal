@@ -104,11 +104,11 @@ SETUP_STAGE_OVERLAY() {
 	export LD_PRELOAD
 }
 
-#:] ### ALSA Mixer Reset
+#:] ### Audio Mixer Reset
 #:] Ensures the primary audio source is at max volume and unmuted.
 #:] PipeWire will handle the volume independently. Of course the TrimUI
 #:] devices works completely backwards, so that is why it is set to '0'.
-RESET_AMIXER() {
+RESET_MIXER() {
 	AUDIO_CONTROL=$(GET_VAR "device" "audio/control")
 	MAX_VOL=$(GET_VAR "device" "audio/max")
 
@@ -131,8 +131,25 @@ WAIT_FOR_AUDIO_SINK() {
 	INTERVAL_MS=100
 	ELAPSED=0
 
+	LAST_ID=""
+	STABLE_COUNT=0
+
 	while [ "$ELAPSED" -lt "$TIMEOUT_MS" ]; do
-		wpctl get-volume @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && return 0
+		ID=$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '/node.id/ {print $3}')
+
+		if [ -n "$ID" ]; then
+			if [ "$ID" = "$LAST_ID" ]; then
+				STABLE_COUNT=$((STABLE_COUNT + 1))
+			else
+				STABLE_COUNT=0
+				LAST_ID="$ID"
+			fi
+
+			# Require the same sink ID to appear multiple times
+			# so that when we reset it doesn't get missed...
+			[ "$STABLE_COUNT" -ge 3 ] && return 0
+		fi
+
 		sleep 0.1
 		ELAPSED=$((ELAPSED + INTERVAL_MS))
 	done
@@ -174,12 +191,14 @@ SET_SAVED_AUDIO_VOLUME() {
 }
 
 RESTORE_AUDIO_VOLUME() {
+	RESET_MIXER
+
 	SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME) || return 1
 
 	WAIT_FOR_AUDIO_SINK 5000 || return 1
 
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
-	/opt/muos/script/device/audio.sh "$SAVED_VOL" >/dev/null 2>&1
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+	/opt/muos/script/device/audio.sh "$SAVED_VOL"
 
 	return 0
 }

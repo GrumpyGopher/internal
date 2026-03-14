@@ -16,7 +16,7 @@ LOG_INFO "$0" 0 "FRONTEND" "Starting Frontend Installer"
 read -r START_TIME _ </proc/uptime
 SET_VAR "system" "start_time" "$START_TIME"
 
-RESET_AMIXER
+RESET_MIXER
 
 while :; do
 	[ -s "$ACT_GO" ] && {
