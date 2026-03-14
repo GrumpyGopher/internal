@@ -192,8 +192,6 @@ DO_START() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Audio State"
 	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore
 
-	SET_SAVED_AUDIO_VOLUME "$(GET_SAVED_AUDIO_VOLUME)"
-
 	if WAIT_FOR_DBUS; then
 		LOG_SUCCESS "$0" 0 "PIPEWIRE" "D-Bus socket is available"
 	else
@@ -206,7 +204,15 @@ DO_START() {
 		exit 1
 	fi
 
+	# Prevent loud pop or incorrect gain during restore
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
+
+	SET_SAVED_AUDIO_VOLUME "$(GET_SAVED_AUDIO_VOLUME)"
 	FINALISE_AUDIO
+	RESET_MIXER
+
+	# Unmute after everything is stable... hopefully!
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 	exit 0
 }
