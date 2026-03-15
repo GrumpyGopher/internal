@@ -14,8 +14,15 @@ case ${#PASS} in
 		printf "network={\n\tssid=\"%s\"\n\tscan_ssid=%s\n\tkey_mgmt=NONE\n}" "$SSID" "$HIDDEN" >"$WPA_CONFIG"
 		;;
 	*)
-		wpa_passphrase "$SSID" "$PASS" | sed -n '/^[ \t]*psk=/s/^[ \t]*psk=//p' >"/opt/muos/config/network/pass"
-		wpa_passphrase "$SSID" "$PASS" >"$WPA_CONFIG"
-		sed -i '3d' "$WPA_CONFIG"
+		WPA_TMP=$(mktemp)
+
+		trap 'rm -f "$WPA_TMP"' EXIT INT TERM
+		wpa_passphrase "$SSID" "$PASS" >"$WPA_TMP"
+
+		# Extract the derived hex PSK and persist it (replacing the plain password)
+		sed -n '/^[[:space:]]*psk=/s/^[[:space:]]*psk=//p' "$WPA_TMP" >"/opt/muos/config/network/pass"
+		sed '/^[[:space:]]*#psk=/d' "$WPA_TMP" >"$WPA_CONFIG"
+
+		rm -f "$WPA_TMP"
 		;;
 esac
