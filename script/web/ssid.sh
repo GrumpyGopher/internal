@@ -9,9 +9,21 @@ NET_SCAN="/tmp/net_scan"
 rm -f "$NET_SCAN"
 
 HEX_ESCAPE() {
-	while IFS= read -r line; do
-		printf "%b\n" "$line"
-	done
+	awk '{
+		out = ""
+		s = $0
+		while (length(s) > 0) {
+			if (substr(s, 1, 2) == "\\x") {
+				hex = substr(s, 3, 2)
+				out = out sprintf("%c", strtonum("0x" hex))
+				s = substr(s, 5)
+			} else {
+				out = out substr(s, 1, 1)
+				s = substr(s, 2)
+			}
+		}
+		print out
+	}'
 }
 
 case "$(GET_VAR "device" "board/name")" in
