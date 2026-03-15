@@ -6,7 +6,11 @@ BOARD_NAME=$(GET_VAR "device" "board/name")
 HAS_NETWORK=$(GET_VAR "device" "board/network")
 NET_NAME=$(GET_VAR "device" "network/name")
 
-depmod -a 2>/dev/null
+MODULES_DIR="/lib/modules/$(uname -r)"
+DEPMOD_STAMP="$MODULES_DIR/depmod.stamp"
+if [ ! -f "$DEPMOD_STAMP" ] || [ -n "$(find "$MODULES_DIR" -newer "$DEPMOD_STAMP" -maxdepth 0)" ]; then
+	depmod -a 2>/dev/null && touch "$DEPMOD_STAMP"
+fi
 
 case "$1" in
 	load)
@@ -30,7 +34,7 @@ case "$1" in
 				# Check if any trimui_inputd process is already running
 				# because this script is typically run with suspend too
 				if ! pgrep -f 'trimui_inputd' >/dev/null 2>&1; then
-				    /opt/muos/bin/trimui_inputd
+					/opt/muos/bin/trimui_inputd &
 				fi
 				;;
 			mgx*)
