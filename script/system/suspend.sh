@@ -4,7 +4,6 @@
 
 # Lonely, oh so lonely...
 RECENT_WAKE="$MUOS_RUN_DIR/recent_wake"
-WAKE_CPU_GOV="$MUOS_RUN_DIR/wake_cpu_gov"
 LED_STATE="$MUOS_RUN_DIR/work_led_state"
 
 RECENT_WAKE="$MUOS_RUN_DIR/recent_wake"
@@ -138,7 +137,11 @@ SLEEP() {
 }
 
 RESUME() {
-	/opt/muos/script/device/module.sh load
+	# Start module loads in the background. The LED, USB, CPU governor,
+	# and brightness restore do not depend on it.  Network reconnect does
+	# (the module needs to be loaded first), so we'll wait before that.
+	/opt/muos/script/device/module.sh load &
+	MODULE_PID=$!
 
 	LED_CONTROL_CHANGE
 
@@ -151,6 +154,9 @@ RESUME() {
 	esac
 
 	RESTORE_CPU_GOV "$CPU_GOV_PATH"
+
+	# Network module must be loaded before attempting reconnect
+	wait "$MODULE_PID"
 
 	if [ "$HAS_NETWORK" -eq 1 ]; then
 		[ "$CONNECT_ON_WAKE" -eq 1 ] && nohup /opt/muos/script/system/network.sh connect >/dev/null 2>&1 &
@@ -176,14 +182,17 @@ RESUME() {
 
 	# We're going to do this twice because of how our brightness script
 	# works with existing integer values.  It's a precise system!
+	_UPTIME=$(cut -d. -f1 /proc/uptime)
+
 	B=0
 	while [ $B -lt 2 ]; do
-		# Pick +1 or -1 randomly... and no $RANDOM is not posix!
-		if [ $(($(od -An -N2 -tu2 /dev/urandom | tr -d ' ') % 2)) -eq 0 ]; then
+		if [ $((_UPTIME % 2)) -eq 0 ]; then
 			E_BRIGHT=$((E_BRIGHT + 1))
 		else
 			E_BRIGHT=$((E_BRIGHT - 1))
 		fi
+
+		_UPTIME=$((_UPTIME + 1))
 
 		[ "$E_BRIGHT" -gt "$MAX_BRIGHT" ] && E_BRIGHT="$((MAX_BRIGHT - 16))"
 
