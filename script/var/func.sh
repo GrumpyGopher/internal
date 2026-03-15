@@ -44,7 +44,20 @@ CONTENT_UNSET() {
 }
 
 CAPITALISE() {
-	printf "%s" "$1" | sed 's/\(^\|[[:space:]]\)\([[:alpha:]]\)/\1\u\2/g'
+	printf "%s" "$1" | awk '
+		{
+			out = ""
+			for (i = 1; i <= length($0); i++) {
+				c = substr($0, i, 1)
+				p = (i == 1) ? " " : substr($0, i - 1, 1)
+				if (p ~ /[[:space:]]/ && c ~ /[[:alpha:]]/) {
+					c = toupper(c)
+				}
+				out = out c
+			}
+			print out
+		}
+	'
 }
 
 TBOX() {
@@ -126,37 +139,6 @@ RESET_MIXER() {
 	return 0
 }
 
-WAIT_FOR_AUDIO_SINK() {
-	TIMEOUT_MS=${1:-5000}
-	INTERVAL_MS=100
-	ELAPSED=0
-
-	LAST_ID=""
-	STABLE_COUNT=0
-
-	while [ "$ELAPSED" -lt "$TIMEOUT_MS" ]; do
-		ID=$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '/node.id/ {print $3}')
-
-		if [ -n "$ID" ]; then
-			if [ "$ID" = "$LAST_ID" ]; then
-				STABLE_COUNT=$((STABLE_COUNT + 1))
-			else
-				STABLE_COUNT=0
-				LAST_ID="$ID"
-			fi
-
-			# Require the same sink ID to appear multiple times
-			# so that when we reset it doesn't get missed...
-			[ "$STABLE_COUNT" -ge 3 ] && return 0
-		fi
-
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL_MS))
-	done
-
-	return 1
-}
-
 GET_SAVED_AUDIO_VOLUME() {
 	SAVED_VOL=$(GET_VAR "config" "settings/general/volume")
 	MIN_VOL=$(GET_VAR "device" "audio/min")
@@ -195,12 +177,13 @@ RESTORE_AUDIO_VOLUME() {
 
 	SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME) || return 1
 
-	WAIT_FOR_AUDIO_SINK 5000 || return 1
+	for _ in 1 2 3 4 5 6 7 8 9 10; do
+		wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
+		sleep 0.5
+	done
 
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 	/opt/muos/script/device/audio.sh "$SAVED_VOL"
-
-	return 0
 }
 
 SET_DEFAULT_GOVERNOR() {
@@ -431,7 +414,7 @@ EXEC_MUX() {
 		while [ ! -f "$MUOS_RUN_DIR/hdmi_mode" ]; do sleep 0.01; done
 	fi
 
-	[ -f "$SAFE_QUIT" ] && rm "$SAFE_QUIT"
+	[ -f "$SAFE_QUIT" ] && rm -f "$SAFE_QUIT"
 
 	GOBACK="$1"
 	MODULE="$2"
@@ -463,7 +446,7 @@ DELETE_CRUFT() {
 			-name '.Trashes' -o \
 			-name '.Spotlight' -o \
 			-name '.fseventsd' \
-			\) -exec rm -rf -- {} \;
+			\) -exec rm -rf -- {} +
 
 		find "$1" -type f \( \
 			-name '._*' -o \
@@ -472,7 +455,7 @@ DELETE_CRUFT() {
 			-name 'Thumbs.db' -o \
 			-name '.DStore' -o \
 			-name '.gitkeep' \
-			\) -exec rm -f -- {} \;
+			\) -exec rm -f -- {} +
 	) &
 }
 
@@ -480,7 +463,8 @@ PARSE_INI() {
 	INI_FILE="$1"
 	SECTION="$2"
 	KEY="$3"
-	sed -nr "/^\[$SECTION\]/ { :l /^${KEY}[ ]*=[ ]*/ { s/^[^=]*=[ ]*//; p; q; }; n; b l; }" "${INI_FILE}"
+
+	sed -n "/^\[$SECTION\]/ { :l /^${KEY}[ ]*=[ ]*/ { s/^[^=]*=[ ]*//; p; q; }; n; b l; }" "${INI_FILE}"
 }
 
 LOG() {
@@ -641,7 +625,7 @@ DISPLAY_READ() {
 			printf "%s" "$1" >/sys/kernel/debug/dispdbg/name
 			printf "%s" "$2" >/sys/kernel/debug/dispdbg/command
 			echo 1 >/sys/kernel/debug/dispdbg/start
-			cat /sys/kernel/debug/dispdbg/info &
+			cat /sys/kernel/debug/dispdbg/info
 			;;
 		rk-g350*) cat /sys/class/backlight/backlight/brightness ;;
 		*) ;;
@@ -744,7 +728,7 @@ SETUP_SDL_ENVIRONMENT() {
 		*)
 			CON_GO="/tmp/con_go"
 			if [ -e "$CON_GO" ]; then
-				SEL="$(cat "$CON_GO")"
+				IFS= read -r SEL <"$CON_GO"
 				case "$SEL" in
 					# honour "system" - otherwise use whatever was selected from content...
 					system)
@@ -793,7 +777,7 @@ SETUP_APP() {
 	echo app >"/tmp/act_go"
 
 	GOV_GO="/tmp/gov_go"
-	[ -e "$GOV_GO" ] && cat "$GOV_GO" >"$(GET_VAR "device" "cpu/governor")"
+	[ -e "$GOV_GO" ] && cp -f "$GOV_GO" "$(GET_VAR "device" "cpu/governor")"
 
 	HOME="$(GET_VAR "device" "board/home")"
 	export HOME
@@ -827,14 +811,15 @@ DETECT_CONTROL_SWAP() {
 	}
 
 	if [ -e "$CON_GO" ]; then
-		case "$(cat "$CON_GO")" in
+		IFS= read -r _CON_VAL <"$CON_GO"
+		case "$_CON_VAL" in
 			modern) DO_SWAP ;;
 			retro) ;;
 			*) [ "$(GET_VAR "config" "settings/advanced/swap")" -eq 1 ] && DO_SWAP ;;
 		esac
 	fi
 
-	echo $IS_SWAP
+	printf "%s\n" "$IS_SWAP"
 }
 
 CONFIGURE_RETROARCH() {
@@ -863,38 +848,47 @@ CONFIGURE_RETROARCH() {
 		printf "custom_viewport_width = \"%s\"\n" "$RA_WIDTH"
 		printf "custom_viewport_height = \"%s\"\n" "$RA_HEIGHT"
 		if [ "$RA_WIDTH" -ge 1280 ]; then
-			printf "rgui_aspect_ratio = \"%s\"" "1"
+			printf "rgui_aspect_ratio = \"%s\"\n" "1"
 		else
-			printf "rgui_aspect_ratio = \"%s\"" "0"
+			printf "rgui_aspect_ratio = \"%s\"\n" "0"
 		fi
 	) >"$RA_CONTROL.resolution.cfg"
 
 	# Modify the RetroArch threaded video option based on content settings
 	RAC_GO="/tmp/rac_go"
-	RAC_VAL="false"
-	[ -f "$RAC_GO" ] && RAC_VAL=$(cat "$RAC_GO")
-	sed -i '/^video_threaded = /d' "$RA_CONF"
-	printf 'video_threaded = "%s"\n' "$RAC_VAL" >"$RA_CONTROL.threaded.cfg"
+	if [ -f "$RAC_GO" ]; then
+		IFS= read -r RAC_VAL <"$RAC_GO"
+		sed -i '/^video_threaded = /d' "$RA_CONF"
+		printf 'video_threaded = "%s"\n' "$RAC_VAL" >>"$RA_CONF"
+	fi
 
 	# Include default button mappings from retroarch.device.cfg. Settings in the
 	# retroarch.cfg will take precedence. Modified settings will save to the main
 	# retroarch.cfg, not the included retroarch.device.cfg file.
-	RA_TYPES="device resolution threaded"
+	RA_TYPES="device resolution"
 
 	# Create a temporary config file with all matching lines from the original config,
 	# excluding any existing include lines for the given RetroArch types in the var.
-	TMP_RA_CONF=$(mktemp)
-	for TYPE in $RA_TYPES; do
-		printf '#include "%s.%s.cfg"\n' "$RA_CONTROL" "$TYPE"
-	done | grep -vFf - "$RA_CONF" >"$TMP_RA_CONF"
+	TMP_RA_CONF=$(mktemp) || return 1
+	(
+		trap 'rm -f "$TMP_RA_CONF"' EXIT
 
-	# Append the required include lines to the clean config so they are always present.
-	for TYPE in $RA_TYPES; do
-		printf '#include "%s.%s.cfg"\n' "$RA_CONTROL" "$TYPE" >>"$TMP_RA_CONF"
-	done
+		# Exclude any existing include lines for the given RetroArch types.
+		for TYPE in $RA_TYPES; do
+			printf '#include "%s.%s.cfg"\n' "$RA_CONTROL" "$TYPE"
+		done | grep -vFf - "$RA_CONF" >"$TMP_RA_CONF"
 
-	# Replace the original config with the modified version.
-	mv "$TMP_RA_CONF" "$RA_CONF"
+		# Append the required include lines so they are always present.
+		for TYPE in $RA_TYPES; do
+			printf '#include "%s.%s.cfg"\n' "$RA_CONTROL" "$TYPE" >>"$TMP_RA_CONF"
+		done
+
+		# Replace the original config with the modified version.
+		mv "$TMP_RA_CONF" "$RA_CONF"
+	) || {
+		rm -f "$TMP_RA_CONF"
+		return 1
+	}
 
 	# Set kiosk mode value based on current configuration.
 	KIOSK_MODE=$([ "$(GET_VAR "kiosk" "content/retroarch")" -eq 1 ] && echo true || echo false)
@@ -902,9 +896,12 @@ CONFIGURE_RETROARCH() {
 
 	# Re-define the symlink to current configuration.
 	HOME_CFG="$(GET_VAR "device" "board/home")/.config"
-	rm -rf "$HOME_CFG/retroarch" # Purge it just in case it was created by something else!
+
+	# Purge it just in case it was created by something else!
+	rm -rf "$HOME_CFG/retroarch"
 	ln -s "$MUOS_SHARE_DIR/emulator/retroarch" "$HOME_CFG/retroarch"
-	ln -s "$MUOS_SHARE_DIR/info/config/retroarch.cfg" "$HOME_CFG/retroarch/retroarch.cfg"
+	rm -f "$MUOS_SHARE_DIR/emulator/retroarch/retroarch.cfg"
+	ln -s "$MUOS_SHARE_DIR/info/config/retroarch.cfg" "$MUOS_SHARE_DIR/emulator/retroarch/retroarch.cfg"
 
 	EXTRA_ARGS=""
 	APPEND_LIST=""
@@ -1127,7 +1124,7 @@ LOG_CLEANER() {
 	LOG_DIR="$(GET_VAR "device" "storage/rom/mount")"
 	DAYS=7
 
-	find "$LOG_DIR" -type f -name '*.log' -mtime +"$DAYS" -exec rm -f -- {} \;
+	find "$LOG_DIR" -type f -name '*.log' -mtime +"$DAYS" -exec rm -f -- {} +
 }
 
 SAVE_CPU_GOV() {
