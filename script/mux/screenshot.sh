@@ -6,6 +6,7 @@ SS_LOCK="/tmp/screenshot.lock"
 
 if [ ! -e "$SS_LOCK" ]; then
 	touch "$SS_LOCK"
+	trap 'rm -f "$SS_LOCK"' EXIT INT TERM
 
 	RUMBLE "$(GET_VAR "device" "board/rumble")" 0.3
 
@@ -25,6 +26,4 @@ if [ ! -e "$SS_LOCK" ]; then
 		rg28xx-h) /opt/muos/frontend/mufbset -g "$SS_FILE" && convert "$SS_FILE" -rotate 90 "$SS_FILE" ;;
 		*) /opt/muos/frontend/mufbset -g "$SS_FILE" ;;
 	esac
-
-	rm "$SS_LOCK"
 fi
