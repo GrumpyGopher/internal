@@ -20,11 +20,17 @@ esac
 # These scripts return as soon as the necessary mounts are available, but also
 # leave background jobs running that respond to future media add/remove events.
 /opt/muos/script/mount/storage.sh "rom" "mount" 1 &
-/opt/muos/script/mount/storage.sh "sdcard" "mount" 1 &
-/opt/muos/script/mount/storage.sh "usb" "mount" 1 &
+ROM_PID=$!
 
-# Wait for mounts required by the boot process to become available
-wait
+/opt/muos/script/mount/storage.sh "sdcard" "mount" 1 &
+SD_PID=$!
+
+# Going to comment this out for now, it seems not everyone is interested in
+# USB mounting and perhaps we could add this functionality somewhere else?
+# /opt/muos/script/mount/storage.sh "usb" "mount" 1 &
+
+# Wait only for the mounts required by the boot process to become available
+wait $ROM_PID $SD_PID
 
 # We're all set for our device storage at least for now so we'll run
 # the union script to merge all of the potential content directories.
