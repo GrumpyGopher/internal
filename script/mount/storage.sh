@@ -47,8 +47,9 @@ HAS_DEVICE() {
 }
 
 MOUNT_DEVICE() {
-	FS_TYPE="$(blkid -o value -s TYPE "/dev/$DEVICE" 2>/dev/null)"
-	FS_LABEL="$(blkid -o value -s LABEL "/dev/$DEVICE" 2>/dev/null)"
+	FS_INFO="$(blkid -o export "/dev/$DEVICE" 2>/dev/null)"
+	FS_TYPE="$(printf '%s\n' "$FS_INFO" | awk -F= '/^TYPE=/{print $2}')"
+	FS_LABEL="$(printf '%s\n' "$FS_INFO" | awk -F= '/^LABEL=/{print $2}')"
 
 	case "$FS_TYPE" in
 		vfat | exfat) FS_OPTS="rw,utf8,noatime,nofail" ;;
