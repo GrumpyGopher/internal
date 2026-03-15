@@ -81,7 +81,7 @@ SOFT_KILL() {
 # Die!
 HARD_KILL() {
 	PIDS=$(GET_PIDS)
-	[ -n "$PIDS" ] && kill -KILL $PIDS >/dev/null 2>&1
+	[ -n "$PIDS" ] && kill -KILL "$PIDS" >/dev/null 2>&1
 }
 
 MANAGE_WEBSERV() {
@@ -177,7 +177,7 @@ case "$1" in
 			fi
 		done
 
-		wait >/dev/null 2>&1
+		wait
 		;;
 esac
 
