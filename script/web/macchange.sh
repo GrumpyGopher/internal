@@ -19,7 +19,7 @@ while [ "$WAIT_IFACE" -gt 0 ]; do
 done
 
 ip link set dev "$IFCE" down
-/usr/bin/macchanger -r "$IFCE"
+NEW_MAC=$(/usr/bin/macchanger -r "$IFCE" | awk '/^New MAC:/{print $3}')
 
 SET_VAR "config" "network/mac" "$NEW_MAC"
 /opt/muos/script/device/network.sh unload
