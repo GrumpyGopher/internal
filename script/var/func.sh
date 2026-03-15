@@ -439,8 +439,7 @@ EXEC_MUX() {
 
 	[ -n "$GOBACK" ] && echo "$GOBACK" >"$ACT_GO"
 
-	# Reset audio control status
-	RESET_MIXER
+	RESTORE_AUDIO_VOLUME
 
 	SET_VAR "system" "foreground_process" "$MODULE"
 	"/opt/muos/frontend/$MODULE" "$@"
