@@ -47,7 +47,7 @@ SAR_GO="/tmp/sar_go"
 R_DIR="$R_DIR1$R_DIR2"
 ROM="$R_DIR/$ROM_NAME"
 
-printf "%s\n%s\n%s" "$NAME" "$ASSIGN" "$CORE" >$OVL_GO
+printf "%s\n%s\n%s" "$NAME" "$ASSIGN" "$CORE" >"$OVL_GO"
 [ -e "$OVERLAY_NOP" ] && rm -f "$OVERLAY_NOP"
 
 DISCORD_DIR="$ROM_MOUNT/MUOS/discord"
