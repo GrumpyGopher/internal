@@ -74,9 +74,12 @@ CALCULATE_IAID() {
 
 # Exterminate!
 DESTROY_DHCPCD() {
-	killall -q dhcpcd udhcpc wpa_supplicant 2>/dev/null
-	sleep 1
-	killall -9 dhcpcd udhcpc wpa_supplicant 2>/dev/null
+	# Only pay the ferry man if there is actually something to kill!
+	if pidof dhcpcd udhcpc wpa_supplicant >/dev/null 2>&1; then
+		killall -q dhcpcd udhcpc wpa_supplicant 2>/dev/null
+		sleep 1
+		killall -9 dhcpcd udhcpc wpa_supplicant 2>/dev/null
+	fi
 
 	LOG_INFO "$0" 0 "NETWORK" "Clearing Previous DHCP Addresses"
 	rm -rf /var/db/dhcpcd/*
