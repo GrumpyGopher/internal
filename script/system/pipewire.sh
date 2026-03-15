@@ -114,8 +114,8 @@ FINALISE_AUDIO() {
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to set default node '%s'" "$DEF_ID")"
 	}
 
+	sleep 0.1
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
-	RESET_MIXER
 
 	if [ -n "$RUNTIME_PERCENT" ]; then
 		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${RUNTIME_PERCENT}%"
@@ -126,6 +126,10 @@ FINALISE_AUDIO() {
 			3) SET_SAVED_AUDIO_VOLUME "$(GET_VAR "device" "audio/max")" ;;
 			*) ;;
 		esac
+	else
+		SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME)
+		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${SAVED_VOL}%"
+		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Restored saved volume: %s%%" "$SAVED_VOL")"
 	fi
 
 	[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
@@ -156,21 +160,29 @@ START_PIPEWIRE() {
 
 WAIT_FOR_DBUS() {
 	ELAPSED=0
+
 	while [ ! -S "$DBUS_SOCKET" ]; do
 		sleep 0.1
 		ELAPSED=$((ELAPSED + INTERVAL))
 		[ "$ELAPSED" -ge "$TIMEOUT" ] && return 1
 	done
+
 	return 0
 }
 
 WAIT_FOR_PIPEWIRE() {
+	TARGET_ID=$(GET_TARGET_NODE)
 	ELAPSED=0
+
 	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		SOCKET_READY && return 0
+		if SOCKET_READY; then
+			pw-dump 2>/dev/null | grep -q "$TARGET_ID" && return 0
+		fi
 		sleep 0.1
 		ELAPSED=$((ELAPSED + INTERVAL))
 	done
+
+	LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Target node '%s' not ready after timeout" "$TARGET_ID")"
 	return 1
 }
 
@@ -192,6 +204,8 @@ DO_START() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Audio State"
 	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore
 
+	RESET_MIXER
+
 	if WAIT_FOR_DBUS; then
 		LOG_SUCCESS "$0" 0 "PIPEWIRE" "D-Bus socket is available"
 	else
@@ -209,10 +223,6 @@ DO_START() {
 
 	SET_SAVED_AUDIO_VOLUME "$(GET_SAVED_AUDIO_VOLUME)"
 	FINALISE_AUDIO
-	RESET_MIXER
-
-	# Unmute after everything is stable... hopefully!
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 	exit 0
 }
