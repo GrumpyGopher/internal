@@ -73,83 +73,64 @@ case "$BOARD_NAME" in
 		;;
 esac
 
-# Add device specific Retroarch Binary
+# Install a flat binary if its MD5 differs from the installed copy.
+INSTALL_BIN() {
+	SRC_BIN="$1"
+	SRC_MD5="$2"
+	TGT_BIN="$3"
+
+	[ -e "$SRC_BIN" ] || return 0
+
+	EXPECTED_MD5=$(cat "$SRC_MD5" 2>/dev/null) || return 0
+
+	CURRENT_MD5=""
+	[ -f "$TGT_BIN" ] && CURRENT_MD5=$(md5sum "$TGT_BIN" | awk '{ print $1 }')
+
+	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
+		cp -f "$SRC_BIN" "$TGT_BIN"
+		chmod +x "$TGT_BIN"
+	fi
+}
+
+# Install a binary packed inside a versioned tar.gz if its MD5 differs from the installed copy.
+INSTALL_ARCHIVE() {
+	ARCHIVE="$1"
+	MD5_FILE="$2"
+	INSTALL_DIR="$3"
+	GLOB="$4"
+	TGT_BIN="$5"
+
+	[ -e "$ARCHIVE" ] || return 0
+
+	EXPECTED_MD5=$(cat "$MD5_FILE" 2>/dev/null) || return 0
+
+	CURRENT_MD5=""
+	[ -f "$TGT_BIN" ] && CURRENT_MD5=$(md5sum "$TGT_BIN" | awk '{ print $1 }')
+
+	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
+		_INST_TMP=$(mktemp -d "${INSTALL_DIR}/tmp.XXXXXX") || return 1
+		gzip -dc -- "$ARCHIVE" | tar -xf - -C "$_INST_TMP"
+
+		SRC_BIN=$(find "$_INST_TMP" -maxdepth 1 -type f -name "$GLOB" | head -n 1)
+
+		if [ -n "$SRC_BIN" ]; then
+			cp -f "$SRC_BIN" "$TGT_BIN"
+			chmod +x "$TGT_BIN"
+		else
+			echo "Error: no $GLOB binary found in $ARCHIVE" >&2
+		fi
+
+		rm -rf "$_INST_TMP"
+	fi
+}
+
 RA_DIR="$MUOS_SHARE_DIR/emulator/retroarch"
-RA_BIN="$RA_DIR/retroarch-${EMU_VER}"
-RA_MD5="$RA_DIR/retroarch-${EMU_VER}.md5"
-RA_TGT="/usr/bin/retroarch"
+INSTALL_BIN "$RA_DIR/retroarch-${EMU_VER}" "$RA_DIR/retroarch-${EMU_VER}.md5" "/usr/bin/retroarch" &
 
-if [ -e "$RA_BIN" ]; then
-	if [ -f "$RA_TGT" ]; then
-		CURRENT_MD5=$(md5sum "$RA_TGT" | awk '{ print $1 }')
-		if [ "$CURRENT_MD5" != "$RA_MD5" ]; then
-			cp -f "$RA_BIN" "$RA_TGT"
-			chmod +x "$RA_TGT"
-		fi
-	else
-		cp -f "$RA_BIN" "$RA_TGT"
-		chmod +x "$RA_TGT"
-	fi
-fi
-
-# Add device specific PPSSPP Binary
 PPSSPP_DIR="$MUOS_SHARE_DIR/emulator/ppsspp"
-PPSSPP_BIN="$PPSSPP_DIR/PPSSPP"
-PPSSPP_ARCHIVE="${PPSSPP_BIN}-${EMU_VER}.tar.gz"
-PPSSPP_MD5="$PPSSPP_BIN-${EMU_VER}.md5"
+INSTALL_ARCHIVE "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.tar.gz" "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.md5" "$PPSSPP_DIR" "PPSSPP-*" "${PPSSPP_DIR}/PPSSPP" &
 
-if [ -e "$PPSSPP_ARCHIVE" ]; then
-	EXPECTED_MD5=$(cat "$PPSSPP_MD5")
-
-	CURRENT_MD5=""
-	[ -f "$PPSSPP_BIN" ] && CURRENT_MD5=$(md5sum "$PPSSPP_BIN" | awk '{ print $1 }')
-
-	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
-		TMPDIR=$(mktemp -d "$PPSSPP_DIR/ppsspp-tmp.XXXXXX") || exit 1
-		# Use gzip stdin to extract, no '-z' available in busybox tar.
-		gzip -dc -- "$PPSSPP_ARCHIVE" | tar -xf - -C "$TMPDIR"
-
-		# Find the extracted binary (PPSSPP-rg or PPSSPP-tui)
-		SRC_BIN=$(find "$TMPDIR" -maxdepth 1 -type f -name 'PPSSPP-*' | head -n 1)
-
-		if [ -n "$SRC_BIN" ]; then
-			cp -f "$SRC_BIN" "$PPSSPP_BIN"
-			chmod +x "$PPSSPP_BIN"
-		else
-			echo "Error: no PPSSPP-* binary found in archive $PPSSPP_ARCHIVE" >&2
-		fi
-
-		rm -rf "$TMPDIR"
-	fi
-fi
-
-# Add device specific ScummVM binary
 SCUMMVM_DIR="$MUOS_SHARE_DIR/emulator/scummvm"
-SCUMMVM_BIN="$SCUMMVM_DIR/scummvm"
-SCUMMVM_ARCHIVE="${SCUMMVM_BIN}-${EMU_VER}.tar.gz"
-SCUMMVM_MD5="$SCUMMVM_BIN-${EMU_VER}.md5"
+INSTALL_ARCHIVE "${SCUMMVM_DIR}/scummvm-${EMU_VER}.tar.gz" "${SCUMMVM_DIR}/scummvm-${EMU_VER}.md5" "$SCUMMVM_DIR" "scummvm-*" "${SCUMMVM_DIR}/scummvm" &
 
-if [ -e "$SCUMMVM_ARCHIVE" ]; then
-	EXPECTED_MD5=$(cat "$SCUMMVM_MD5")
-
-	CURRENT_MD5=""
-	[ -f "$SCUMMVM_BIN" ] && CURRENT_MD5=$(md5sum "$SCUMMVM_BIN" | awk '{ print $1 }')
-
-	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
-		TMPDIR=$(mktemp -d "$SCUMMVM_DIR/scummvm-tmp.XXXXXX") || exit 1
-		# Use gzip stdin to extract, no '-z' available in busybox tar.
-		gzip -dc -- "$SCUMMVM_ARCHIVE" | tar -xf - -C "$TMPDIR"
-
-		# Find the extracted binary (scummvm-rg or scummvm-tui)
-		SRC_BIN=$(find "$TMPDIR" -maxdepth 1 -type f -name 'scummvm-*' | head -n 1)
-
-		if [ -n "$SRC_BIN" ]; then
-			cp -f "$SRC_BIN" "$SCUMMVM_BIN"
-			chmod +x "$SCUMMVM_BIN"
-		else
-			echo "Error: no scummvm-* binary found in archive $SCUMMVM_ARCHIVE" >&2
-		fi
-
-		rm -rf "$TMPDIR"
-	fi
-fi
+wait
