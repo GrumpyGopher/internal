@@ -218,6 +218,49 @@ sort -u "$TMP_RESULTS" >"$TMP_RESULTS_NO_DUPE"
 # the fucking JSON structure manually... we probably don't need all the spaces but trying
 # to debug a compact JSON is a pain in the arse.  So here we are, we could probably maybe
 # use jq somehow to make things easier on ourselves but this will have to suffice for now
+
+TMP_FOLDERS="${TMP_DIR}/folders_block"
+
+LAST_DIR=""
+HAVE_ITEMS=0
+
+while IFS='|' read -r TAG DIR BASE PRETTY; do
+	[ -z "$BASE" ] && continue
+	[ -z "$PRETTY" ] && continue
+
+	case "$DIR" in
+		.) FULL_DIR="$(IRP "$TAG")" ;;
+		*) FULL_DIR="$(IRP "$TAG")/$DIR" ;;
+	esac
+
+	if [ "$FULL_DIR" != "$LAST_DIR" ]; then
+		if [ -n "$LAST_DIR" ] && [ "$HAVE_ITEMS" -eq 1 ]; then
+			printf "\n      ]\n    },\n" >>"$TMP_FOLDERS"
+		fi
+
+		printf "    \"%s\": {\n" "$FULL_DIR" >>"$TMP_FOLDERS"
+		printf "      \"content\": [\n" >>"$TMP_FOLDERS"
+
+		HAVE_ITEMS=0
+	fi
+
+	if [ "$HAVE_ITEMS" -eq 1 ]; then
+		printf ",\n" >>"$TMP_FOLDERS"
+	fi
+
+	printf "        {\n          \"file\": \"%s\",\n          \"name\": \"%s\"\n        }" \
+		"$(printf '%s' "$BASE" | jq -R . | sed 's/^"//;s/"$//')" \
+		"$(printf '%s' "$PRETTY" | jq -R . | sed 's/^"//;s/"$//')" \
+		>>"$TMP_FOLDERS"
+
+	HAVE_ITEMS=1
+	LAST_DIR="$FULL_DIR"
+done <"$TMP_RESULTS_NO_DUPE"
+
+if [ "$HAVE_ITEMS" -eq 1 ]; then
+	printf "\n      ]\n    }\n" >>"$TMP_FOLDERS"
+fi
+
 {
 	printf "{\n"
 	printf "  \"lookup\": \"%s\",\n" "$(printf '%s' "$S_TERM" | jq -R . | sed 's/^"//;s/"$//')"
@@ -232,50 +275,9 @@ sort -u "$TMP_RESULTS" >"$TMP_RESULTS_NO_DUPE"
 	printf "  ],\n"
 
 	printf "  \"folders\": {\n"
-
-	LAST_DIR=""
-	HAVE_ITEMS=0
-
-	sort "$TMP_RESULTS_NO_DUPE" |
-		while IFS='|' read -r TAG DIR BASE PRETTY; do
-			[ -z "$BASE" ] && continue
-			[ -z "$PRETTY" ] && continue
-
-			case "$DIR" in
-				.) FULL_DIR="$(IRP "$TAG")" ;;
-				*) FULL_DIR="$(IRP "$TAG")/$DIR" ;;
-			esac
-
-			if [ "$FULL_DIR" != "$LAST_DIR" ]; then
-				if [ "$LAST_DIR" != "" ] && [ "$HAVE_ITEMS" -eq 1 ]; then
-					printf "\n      ]\n    },\n"
-				fi
-
-				printf "    \"%s\": {\n" "$FULL_DIR"
-				printf "      \"content\": [\n"
-
-				HAVE_ITEMS=0
-			fi
-
-			if [ "$HAVE_ITEMS" -eq 1 ]; then
-				printf ",\n"
-			fi
-
-			printf "        {\n          \"file\": \"%s\",\n          \"name\": \"%s\"\n        }" \
-				"$(printf '%s' "$BASE" | jq -R . | sed 's/^"//;s/"$//')" \
-				"$(printf '%s' "$PRETTY" | jq -R . | sed 's/^"//;s/"$//')"
-
-			HAVE_ITEMS=1
-			LAST_DIR="$FULL_DIR"
-		done
-
-	if [ "$HAVE_ITEMS" -eq 1 ]; then
-		printf "\n      ]\n    }\n"
-	fi
-
-	printf "\n      ]\n"
-	printf "    }\n"
+	[ -f "$TMP_FOLDERS" ] && cat "$TMP_FOLDERS"
 	printf "  }\n"
+
 	printf "}\n"
 
 } >"$JSON_OUT"
