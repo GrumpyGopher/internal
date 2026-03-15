@@ -20,13 +20,15 @@ CLOSE_CONTENT() {
 		sleep 0.1
 		kill -TERM "$FG_PROC_PID" 2>/dev/null
 
-		for _ in $(seq 1 40); do
+		_I=0
+		while [ "$_I" -lt 40 ]; do
 			if ! kill -KILL "$FG_PROC_PID" 2>/dev/null; then
 				LOG_INFO "$0" 0 "QUIT" "$(printf "Killed (%s)..." "$FG_PROC_VAL")"
 				return
 			fi
 
 			sleep 0.1
+			_I=$((_I + 1))
 		done
 	fi
 }
