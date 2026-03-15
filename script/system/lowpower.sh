@@ -36,7 +36,7 @@ LOW_BATTERY_WARNING() {
 
 		[ "$USING_RGB" -eq 1 ] && [ ! -e "$IS_IDLE" ] && LED_CONTROL_CHANGE
 	else
-		rm "$BATT_OVERLAY"
+		rm -f "$BATT_OVERLAY"
 	fi
 }
 
