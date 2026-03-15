@@ -182,13 +182,20 @@ UPDATE_UMTPRD_CONF() {
 		sed -i 's|^storage "/mnt/sdcard"|#storage "/mnt/sdcard"|' /etc/umtprd/umtprd.conf
 	fi
 
+	_VID="$(USB_VID)"
+	_PID="$(USB_PID)"
+	_SER="$(USB_SERIAL)"
+	_MFR="$(USB_MANUFACTURER)"
+	_PRD="$(USB_PRODUCT)"
+	_FWV="$(FIRMWARE_VERSION)"
+
 	sed -i \
-		-e "s/^usb_vendor_id .*/usb_vendor_id \"$(USB_VID)\"/" \
-		-e "s/^usb_product_id .*/usb_product_id \"$(USB_PID)\"/" \
-		-e "s/^serial .*/serial \"$(USB_SERIAL)\"/" \
-		-e "s/^manufacturer .*/manufacturer \"$(USB_MANUFACTURER)\"/" \
-		-e "s/^product .*/product \"$(USB_PRODUCT)\"/" \
-		-e "s/^firmware_version .*/firmware_version \"$(FIRMWARE_VERSION)\"/" \
+		-e "s/^usb_vendor_id .*/usb_vendor_id \"$_VID\"/" \
+		-e "s/^usb_product_id .*/usb_product_id \"$_PID\"/" \
+		-e "s/^serial .*/serial \"$_SER\"/" \
+		-e "s/^manufacturer .*/manufacturer \"$_MFR\"/" \
+		-e "s/^product .*/product \"$_PRD\"/" \
+		-e "s/^firmware_version .*/firmware_version \"$_FWV\"/" \
 		/etc/umtprd/umtprd.conf
 }
 
