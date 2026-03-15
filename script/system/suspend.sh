@@ -84,6 +84,7 @@ ACTIVITY_TRACKER() {
 
 		case "$1" in
 			start) [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" start ;;
+			resume) [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" resume ;;
 			stop) [ "${USE_ACTIVITY:-0}" -eq 1 ] && /opt/muos/script/mux/track.sh "$NAME" "$CORE" "$ROM" stop ;;
 		esac
 	fi
@@ -162,7 +163,7 @@ RESUME() {
 		[ "$CONNECT_ON_WAKE" -eq 1 ] && nohup /opt/muos/script/system/network.sh connect >/dev/null 2>&1 &
 	fi
 
-	ACTIVITY_TRACKER start &
+	ACTIVITY_TRACKER resume &
 
 	# We're going to wait for the predefined grace period to stop sleep suspend from triggering again
 	RECENT_WAKE_CLEAR_LATER
