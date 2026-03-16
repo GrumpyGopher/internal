@@ -723,8 +723,8 @@ SETUP_SDL_ENVIRONMENT() {
 
 	# Decide controller DB (priority: arg -> /tmp/con_go -> default)
 	case "$REQ_STYLE" in
-		modern) SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_STORE/modern.txt" ;;
-		retro) SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_STORE/retro.txt" ;;
+		modern) GCDB_FILE="$GCDB_STORE/modern.txt" ;;
+		retro) GCDB_FILE="$GCDB_STORE/retro.txt" ;;
 		*)
 			CON_GO="/tmp/con_go"
 			if [ -e "$CON_GO" ]; then
@@ -733,22 +733,26 @@ SETUP_SDL_ENVIRONMENT() {
 					# honour "system" - otherwise use whatever was selected from content...
 					system)
 						if [ "$(GET_VAR "config" "settings/advanced/swap")" -eq 1 ]; then
-							SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_STORE/modern.txt"
+							GCDB_FILE="$GCDB_STORE/modern.txt"
 						else
-							SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_STORE/retro.txt"
+							GCDB_FILE="$GCDB_STORE/retro.txt"
 						fi
 						;;
-					*) SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_STORE/$SEL.txt" ;;
+					*) GCDB_FILE="$GCDB_STORE/$SEL.txt" ;;
 				esac
 			else
-				SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_DEFAULT"
+				GCDB_FILE="$GCDB_STORE/retro.txt"
 			fi
 			;;
 	esac
 
+	# Remove and relink controller DB
+	rm -f "$GCDB_DEFAULT"
+	ln -sf "$GCDB_FILE" "$GCDB_DEFAULT"
+
 	# Set both the SDL controller file and configuration
-	[ ! -r "$SDL_GAMECONTROLLERCONFIG_FILE" ] && SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_DEFAULT"
-	SDL_GAMECONTROLLERCONFIG=$(grep "$(GET_VAR "device" "sdl/name")" "$SDL_GAMECONTROLLERCONFIG_FILE")
+	SDL_GAMECONTROLLERCONFIG_FILE="$GCDB_FILE"
+	SDL_GAMECONTROLLERCONFIG=$(grep "$(GET_VAR "device" "sdl/name")" "$GCDB_FILE")
 
 	export SDL_GAMECONTROLLERCONFIG_FILE SDL_GAMECONTROLLERCONFIG
 
