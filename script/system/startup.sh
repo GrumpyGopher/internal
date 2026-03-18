@@ -174,6 +174,11 @@ LOG_INFO "$0" 0 "BOOTING" "Checking for Safety Script"
 OOPS="$ROM_MOUNT/oops.sh"
 [ -x "$OOPS" ] && "$OOPS" && rm -f "$OOPS"
 
+#:] ### Battery Watchdog
+#:] Start the battery watchdog that helps with voltage calibration.
+LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
+BATTERY start
+
 #:] ### Detect Charging Mode (_handheld mode only_)
 #:] On internal display mode, detect charger state and adjust LEDs accordingly.
 if [ "${CONSOLE_MODE:-0}" -eq 0 ]; then
@@ -192,11 +197,6 @@ if [ "${HAS_NETWORK:-0}" -eq 1 ] && [ "${CONNECT_ON_BOOT:-0}" -eq 1 ]; then
 		/opt/muos/script/system/network.sh connect
 	fi
 fi
-
-#:] ### Battery Watchdog
-#:] Start the battery watchdog that helps with voltage calibration.
-LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
-BATTERY start
 
 #:] ### Hotkey Daemon
 #:] Start the input listener that powers global hotkeys.
