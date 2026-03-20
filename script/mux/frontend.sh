@@ -151,15 +151,8 @@ while :; do
 				pkill -9 -f "nosefart" &
 				;;
 
-			"reboot")
-				PLAY_SOUND reboot
-				/opt/muos/script/mux/quit.sh reboot frontend
-				;;
-
-			"shutdown")
-				PLAY_SOUND shutdown
-				/opt/muos/script/mux/quit.sh poweroff frontend
-				;;
+			"reboot") /opt/muos/script/mux/quit.sh reboot frontend ;;
+			"shutdown") /opt/muos/script/mux/quit.sh poweroff frontend ;;
 
 			*)
 				printf "Unknown Module: %s\n" "$ACTION" >&2

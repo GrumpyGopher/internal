@@ -670,31 +670,6 @@ LCD_ENABLE() {
 	fi
 }
 
-PREP_SOUND() {
-	(
-		SND="$MUOS_SHARE_DIR/media/$1.wav"
-		ENSURE_REMOVED "$SND"
-
-		case "$(GET_VAR "config" "settings/general/sound")" in
-			1)
-				WAV="$MUOS_SHARE_DIR/media/sound/$1.wav"
-				[ -e "$WAV" ] && cp "$WAV" "$SND"
-				;;
-			2)
-				ACTIVE="$(GET_VAR "config" "theme/active")"
-				WAV="$MUOS_STORE_DIR/theme/$ACTIVE/sound/$1.wav"
-				[ -e "$WAV" ] && cp "$WAV" "$SND"
-				;;
-			*) ;;
-		esac
-	) &
-}
-
-PLAY_SOUND() {
-	SND="$MUOS_SHARE_DIR/media/$1.wav"
-	[ -e "$SND" ] && /usr/bin/mpv --really-quiet "$SND"
-}
-
 SETUP_GL4ES() {
 	GL4ES_LIB="/usr/lib/gl4es"
 

@@ -208,12 +208,6 @@ HOTKEY start
 LOG_INFO "$0" 0 "BOOTING" "Starting muX Frontend"
 FRONTEND start
 
-#:] ### System sounds (_background_)
-#:] Preload short UI sounds so they're instant when invoked.
-LOG_INFO  "$0" 0 "BOOTING" "Preparing System Sounds"
-PREP_SOUND reboot &
-PREP_SOUND shutdown &
-
 #:] ### User Init Scripts (_optional_)
 #:] Allow users to run custom boot hooks.
 #:] This can be enabled within the **Advanced Settings** menu.
