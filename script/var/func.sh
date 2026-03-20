@@ -16,6 +16,7 @@ ALSA_CONFIG="/usr/share/alsa/alsa.conf"
 WPA_CONFIG="/etc/wpa_supplicant.conf"
 DEVICE_CONTROL_DIR="/opt/muos/device/control"
 MUOS_LOG_DIR="/opt/muos/log"
+MUOS_LOG_BIN="/opt/muos/frontend/mulog"
 LED_CONTROL_SCRIPT="/opt/muos/script/device/rgb.sh"
 MUOS_RUN_DIR="/run/muos"
 MUOS_SHARE_DIR="/opt/muos/share"
@@ -25,18 +26,15 @@ IS_IDLE="$MUOS_RUN_DIR/is_idle"
 IDLE_STATE="$MUOS_RUN_DIR/idle_state"
 
 export HOME XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS PIPEWIRE_RUNTIME_DIR \
-	ALSA_CONFIG WPA_CONFIG DEVICE_CONTROL_DIR MUOS_LOG_DIR LED_CONTROL_SCRIPT \
-	MUOS_RUN_DIR MUOS_SHARE_DIR MUOS_STORE_DIR OVERLAY_NOP IS_IDLE IDLE_STATE
+	ALSA_CONFIG WPA_CONFIG DEVICE_CONTROL_DIR MUOS_LOG_DIR MUOS_LOG_BIN \
+	LED_CONTROL_SCRIPT MUOS_RUN_DIR MUOS_SHARE_DIR MUOS_STORE_DIR \
+	OVERLAY_NOP IS_IDLE IDLE_STATE
 
 MESSAGE_EXEC="/opt/muos/frontend/muxmessage"
 MESSAGE_TEXT="/tmp/msg_livetext"
 MESSAGE_PROG="/tmp/msg_progress"
 
 mkdir -p "$MUOS_LOG_DIR"
-
-ESC=$(printf '\x1b')
-CSI="${ESC}[38;5;"
-
 SAFE_QUIT=/tmp/safe_quit
 
 CONTENT_UNSET() {
@@ -403,7 +401,7 @@ MESSAGE() {
 SHOW_MESSAGE() {
 	[ ! -f "$MESSAGE_TEXT" ] && MESSAGE start
 
-	if pgrep -x "$MESSAGE_EXEC" >/dev/null; then
+	if pgrep -f "$MESSAGE_EXEC" >/dev/null; then
 		echo "$1" >"$MESSAGE_PROG"
 		echo "$2" >"$MESSAGE_TEXT"
 	fi
@@ -467,43 +465,34 @@ PARSE_INI() {
 	sed -n "/^\[$SECTION\]/ { :l /^${KEY}[ ]*=[ ]*/ { s/^[^=]*=[ ]*//; p; q; }; n; b l; }" "${INI_FILE}"
 }
 
-LOG() {
-	SYMBOL="$1"
-	MODULE="$(basename "$2")"
-	PROGRESS="$3"
-	TITLE="$4"
-	shift 4
-
-	MSG="$1"
-	shift
-
-	TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-	[ -d "$MUOS_LOG_DIR" ] || mkdir -p "$MUOS_LOG_DIR"
-	LOG_FILE="$MUOS_LOG_DIR/$(date +"%Y_%m_%d")_$MODULE.log"
-
-	[ "$#" -gt 0 ] && EXTRA="$*" || EXTRA=""
-
-	LOG_LINE=$(printf "[%s]\t[%s] [%s%s] [%s]\t" "$(UPTIME)" "$TIMESTAMP" "$SYMBOL" "${ESC}[0m" "$MODULE")
-	LOG_LINE="$LOG_LINE$MSG $EXTRA"
-
-	printf "%s\n" "$LOG_LINE" | tee -a "$LOG_FILE"
-
-	# /opt/muos/frontend/muxmessage $PROGRESS "$(printf "%s\n\n%s %s" "$TITLE" "$MSG" "$*")"
-}
-
-LOG_INFO()    { :; }
-LOG_WARN()    { :; }
-LOG_ERROR()   { :; }
-LOG_SUCCESS() { :; }
-LOG_DEBUG()   { :; }
-
 DEBUG_MODE=$(GET_VAR "system" "debug_mode" 2>/dev/null || echo 0)
+
 if [ "$DEBUG_MODE" -eq 1 ]; then
-	LOG_INFO() { LOG "${CSI}33m*" "$@"; }
-	LOG_WARN() { LOG "${CSI}226m!" "$@"; }
-	LOG_ERROR() { LOG "${CSI}196m-" "$@"; }
-	LOG_SUCCESS() { LOG "${CSI}46m+" "$@"; }
-	LOG_DEBUG() { LOG "${CSI}202m?" "$@"; }
+	LOG_INFO() {
+		"$MUOS_LOG_BIN" info "$@"
+	}
+
+	LOG_WARN() {
+		"$MUOS_LOG_BIN" warn "$@"
+	}
+
+	LOG_ERROR() {
+		"$MUOS_LOG_BIN" error "$@"
+	}
+
+	LOG_SUCCESS() {
+		"$MUOS_LOG_BIN" success "$@"
+	}
+
+	LOG_DEBUG() {
+		"$MUOS_LOG_BIN" debug "$@"
+	}
+else
+	LOG_INFO() { :; }
+	LOG_WARN() { :; }
+	LOG_ERROR() { :; }
+	LOG_SUCCESS() { :; }
+	LOG_DEBUG() { :; }
 fi
 
 CRITICAL_FAILURE() {
