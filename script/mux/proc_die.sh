@@ -6,7 +6,7 @@ PROC="$(GET_VAR config system/foreground_process)"
 
 case "$PROC" in
 	mux*) exit 0 ;;
-	*[!0-9]* | "") PIDS="$(pgrep -x "$PROC" 2>/dev/null)" ;;
+	*[!0-9]* | "") PIDS="$(pgrep -f "$PROC" 2>/dev/null)" ;;
 	*) PIDS="$PROC" ;;
 esac
 

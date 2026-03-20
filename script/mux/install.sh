@@ -31,11 +31,7 @@ while :; do
 				;;
 
 			"install") break ;;
-
-			"shutdown")
-				PLAY_SOUND shutdown
-				/opt/muos/script/mux/quit.sh poweroff frontend
-				;;
+			"shutdown") /opt/muos/script/mux/quit.sh poweroff frontend ;;
 
 			*)
 				printf "Unknown Module: %s\n" "$ACTION" >&2

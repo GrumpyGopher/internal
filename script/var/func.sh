@@ -207,7 +207,7 @@ ENSURE_REMOVED() {
 		C=0
 
 		while [ -e "$P" ] && [ "$C" -lt 10 ]; do
-			rm -f -- "$P" 2>/dev/null || :
+			rm -f -- "$P" 2>/dev/null
 
 			[ -e "$P" ] || break
 
@@ -218,8 +218,8 @@ ENSURE_REMOVED() {
 }
 
 GET_FRONTEND_PIDS() {
-	MUX="$(pgrep -x muxfrontend 2>/dev/null || :)"
-	FRO="$(pgrep -x frontend.sh 2>/dev/null || :)"
+	MUX="$(pgrep -f muxfrontend 2>/dev/null)"
+	FRO="$(pgrep -f frontend.sh 2>/dev/null)"
 
 	[ -n "$MUX" ] && printf '%s\n' "$MUX"
 	[ -n "$FRO" ] && printf '%s\n' "$FRO"
@@ -237,14 +237,14 @@ SIGNAL_FRONTEND() {
 	[ -z "$PIDS" ] && return 0
 
 	for PID in $PIDS; do
-		kill "-$SIG" "$PID" 2>/dev/null || :
+		kill "-$SIG" "$PID" 2>/dev/null
 	done
 }
 
 FRONTEND() {
 	case "$1" in
 		stop)
-			[ -n "$SAFE_QUIT" ] && { : >"$SAFE_QUIT" 2>/dev/null || :; }
+			[ -n "$SAFE_QUIT" ] && { : >"$SAFE_QUIT" 2>/dev/null; }
 
 			SIGNAL_FRONTEND USR1
 
@@ -299,13 +299,13 @@ HOTKEY() {
 	case "$1" in
 		stop)
 			rm -f "$IDLE_STATE" 2>/dev/null
-			while pgrep -x muhotkey >/dev/null || pgrep -x hotkey.sh >/dev/null; do
+			while pgrep -f muhotkey >/dev/null || pgrep -f hotkey.sh >/dev/null; do
 				killall -9 muhotkey hotkey.sh
 				sleep 1
 			done
 			;;
 		start)
-			pgrep -x muhotkey >/dev/null && return 0
+			pgrep -f muhotkey >/dev/null && return 0
 			setsid -f /opt/muos/script/mux/hotkey.sh </dev/null >/dev/null 2>&1
 			;;
 		restart)
@@ -322,13 +322,13 @@ HOTKEY() {
 BATTERY() {
 	case "$1" in
 		stop)
-			while pgrep -x mubattery >/dev/null; do
+			while pgrep -f mubattery >/dev/null; do
 				killall -9 mubattery
 				sleep 1
 			done
 			;;
 		start)
-			pgrep -x mubattery >/dev/null && return 0
+			pgrep -f mubattery >/dev/null && return 0
 			setsid -f /opt/muos/frontend/mubattery </dev/null >/dev/null 2>&1
 			;;
 		restart)
@@ -379,13 +379,13 @@ MUXCTL() {
 MESSAGE() {
 	case "$1" in
 		stop)
-			if pgrep -x "$MESSAGE_EXEC" >/dev/null; then
+			if pgrep -f "$MESSAGE_EXEC" >/dev/null; then
 				[ -f "$MESSAGE_TEXT" ] && rm -f "$MESSAGE_TEXT" "$MESSAGE_PROG"
 				pkill -9 -f "$MESSAGE_EXEC"
 			fi
 			;;
 		start)
-			pgrep -x "$MESSAGE_EXEC" >/dev/null && return 0
+			pgrep -f "$MESSAGE_EXEC" >/dev/null && return 0
 			[ ! -f "$MESSAGE_TEXT" ] && touch "$MESSAGE_TEXT"
 			setsid -f "$MESSAGE_EXEC" 0 "" -l "$MESSAGE_TEXT" </dev/null >/dev/null 2>&1
 			;;

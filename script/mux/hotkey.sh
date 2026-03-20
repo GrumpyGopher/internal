@@ -90,7 +90,7 @@ while :; do
 
 		CHARGE_CHECK=$((CHARGE_CHECK + 1))
 		if [ "$CHARGE_CHECK" -ge 32 ]; then
-			if pgrep -x muxcharge >/dev/null 2>&1; then
+			if pgrep -f muxcharge >/dev/null 2>&1; then
 				CHARGE_ACTIVE=1
 			else
 				CHARGE_ACTIVE=0
