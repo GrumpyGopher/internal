@@ -5,8 +5,6 @@
 PF_INTERNAL=$(GET_VAR "device" "audio/pf_internal")
 PF_EXTERNAL=$(GET_VAR "device" "audio/pf_external")
 
-READY=$(GET_VAR "device" "audio/ready")
-
 BOOT_CONSOLE_MODE=$(GET_VAR "config" "boot/device_mode")
 HDMI_INTERNAL_AUDIO=$(GET_VAR "config" "settings/hdmi/audio")
 
@@ -15,22 +13,29 @@ ADV_OD=$(GET_VAR "config" "settings/advanced/overdrive")
 ADV_AR=$(GET_VAR "config" "settings/advanced/audio_ready")
 
 DBUS_SOCKET="/run/dbus/system_bus_socket"
-PW_SOCKET="/run/pipewire-0"
+
+XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run}
+PIPEWIRE_RUNTIME_DIR=${PIPEWIRE_RUNTIME_DIR:-$XDG_RUNTIME_DIR}
+PW_SOCKET="${PIPEWIRE_RUNTIME_DIR}/pipewire-0"
 
 TIMEOUT=3000
 INTERVAL=100
 
 SOCKET_READY() {
 	[ -S "$PW_SOCKET" ] || return 1
-	pw-cli info || return 1
+	pw-cli info 0 >/dev/null 2>&1 || return 1
 	return 0
+}
+
+PROC_RUNNING() {
+	pgrep -x "$1" >/dev/null 2>&1
 }
 
 PROC_GONE() {
 	NAME=$1
-
 	ELAPSED=0
-	while pgrep -x "$NAME"; do
+
+	while PROC_RUNNING "$NAME"; do
 		sleep 0.1
 		ELAPSED=$((ELAPSED + INTERVAL))
 		[ "$ELAPSED" -ge "$TIMEOUT" ] && return 1
@@ -44,42 +49,90 @@ RESTORE_CONF() {
 	DST=$2
 
 	[ -f "$SRC" ] || return 1
-	[ -f "$DST" ] && cmp -s "$SRC" "$DST" && return 0
+
+	if [ -f "$DST" ] && cmp -s "$SRC" "$DST"; then
+		return 0
+	fi
+
 	cp -f "$SRC" "$DST"
 }
 
-GET_NODE_ID() {
-	pw-dump | jq -r '.[] | select(.type=="PipeWire:Interface:Node") | "\(.id) \(.info.props["node.name"])"' |
-		awk -v target="$1" '$0 ~ target {print $1; exit}'
-}
-
 GET_TARGET_NODE() {
-	if [ "$BOOT_CONSOLE_MODE" -eq 1 ]; then
-		TARGET_ID="$PF_EXTERNAL"
-		[ "$HDMI_INTERNAL_AUDIO" -eq 1 ] && TARGET_ID="$PF_INTERNAL"
-	else
-		TARGET_ID="$PF_INTERNAL"
-	fi
+	TARGET_ID=$PF_INTERNAL
 
-	ELAPSED=0
-	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		pw-dump | grep -q "$TARGET_ID" && break
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-	done
+	if [ "${BOOT_CONSOLE_MODE:-0}" -eq 1 ]; then
+		TARGET_ID=$PF_EXTERNAL
+		[ "${HDMI_INTERNAL_AUDIO:-0}" -eq 1 ] && TARGET_ID=$PF_INTERNAL
+	fi
 
 	printf "%s\n" "$TARGET_ID"
 }
 
+GET_NODE_ID() {
+	TARGET_NAME=$1
+
+	pw-dump 2>/dev/null |
+		jq -r '
+			.[] |
+			select(.type == "PipeWire:Interface:Node") |
+			select(.info.props["node.name"] != null) |
+			"\(.id)\t\(.info.props["node.name"])"
+		' 2>/dev/null |
+		awk -F '\t' -v target="$TARGET_NAME" '$2 == target { print $1; exit }'
+}
+
+WAIT_FOR_DBUS() {
+	ELAPSED=0
+
+	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+		[ -S "$DBUS_SOCKET" ] && return 0
+		sleep 0.1
+		ELAPSED=$((ELAPSED + INTERVAL))
+	done
+
+	return 1
+}
+
+WAIT_FOR_PIPEWIRE_SOCKET() {
+	ELAPSED=0
+
+	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+		if SOCKET_READY; then
+			return 0
+		fi
+
+		sleep 0.1
+		ELAPSED=$((ELAPSED + INTERVAL))
+	done
+
+	return 1
+}
+
+WAIT_FOR_TARGET_NODE() {
+	TARGET_NAME=$1
+	ELAPSED=0
+
+	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+		NODE_ID=$(GET_NODE_ID "$TARGET_NAME")
+		[ -n "$NODE_ID" ] && return 0
+
+		sleep 0.1
+		ELAPSED=$((ELAPSED + INTERVAL))
+	done
+
+	return 1
+}
+
 GET_BOOT_RUNTIME_PERCENT() {
+	V=
+
 	case "$ADV_VOL" in
 		3) V=100 ;;
 		2) V=35 ;;
 		1) V=0 ;;
-		*) V= ;;
 	esac
 
-	if [ "$BOOT_CONSOLE_MODE" -eq 1 ]; then
+	if [ "${BOOT_CONSOLE_MODE:-0}" -eq 1 ]; then
 		if [ "${ADV_OD:-0}" -eq 1 ]; then
 			V=200
 		else
@@ -90,108 +143,87 @@ GET_BOOT_RUNTIME_PERCENT() {
 	printf "%s\n" "$V"
 }
 
+START_PIPEWIRE() {
+	RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" "/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
+
+	if SOCKET_READY; then
+		LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire already running and socket is ready"
+	else
+		if PROC_RUNNING pipewire; then
+			LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire process exists but socket is not ready; restarting"
+			pkill -15 -x pipewire 2>/dev/null
+			PROC_GONE pipewire || pkill -9 -x pipewire 2>/dev/null
+		fi
+
+		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Starting PipeWire (runtime: %s)" "$PIPEWIRE_RUNTIME_DIR")"
+		PIPEWIRE_RUNTIME_DIR="$PIPEWIRE_RUNTIME_DIR" \
+			XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+			chrt -f 88 pipewire -c "$MUOS_SHARE_DIR/conf/pipewire.conf" >/dev/null 2>&1 &
+	fi
+
+	if PROC_RUNNING wireplumber; then
+		LOG_WARN "$0" 0 "PIPEWIRE" "WirePlumber already running"
+	else
+		LOG_INFO "$0" 0 "PIPEWIRE" "Starting WirePlumber..."
+		PIPEWIRE_RUNTIME_DIR="$PIPEWIRE_RUNTIME_DIR" \
+			XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+			wireplumber >/dev/null 2>&1 &
+	fi
+
+	return 0
+}
+
 FINALISE_AUDIO() {
-	TARGET_ID=$(GET_TARGET_NODE)
-	DEF_ID=""
+	TARGET_NAME=$(GET_TARGET_NODE)
 	RUNTIME_PERCENT=$(GET_BOOT_RUNTIME_PERCENT)
+	DEF_ID=
 
-	ELAPSED=0
-	while [ -z "$DEF_ID" ]; do
-		DEF_ID=$(GET_NODE_ID "$TARGET_ID")
-		[ -n "$DEF_ID" ] && break
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-		[ "$ELAPSED" -ge "$TIMEOUT" ] && break
-	done
-
-	if [ -z "$DEF_ID" ]; then
-		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "No matching PipeWire node for target '%s' after timeout" "$TARGET_ID")"
-		[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+	if ! WAIT_FOR_TARGET_NODE "$TARGET_NAME"; then
+		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Target node '%s' not ready after timeout" "$TARGET_NAME")"
+		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		return 1
 	fi
 
-	wpctl set-default "$DEF_ID" || {
+	DEF_ID=$(GET_NODE_ID "$TARGET_NAME")
+	if [ -z "$DEF_ID" ]; then
+		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to resolve node id for target '%s'" "$TARGET_NAME")"
+		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+		return 1
+	fi
+
+	if ! wpctl set-default "$DEF_ID" >/dev/null 2>&1; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to set default node '%s'" "$DEF_ID")"
-	}
+	fi
 
 	sleep 0.1
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
 
 	if [ -n "$RUNTIME_PERCENT" ]; then
-		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${RUNTIME_PERCENT}%"
+		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${RUNTIME_PERCENT}%" >/dev/null 2>&1
 
 		case "$ADV_VOL" in
 			1) SET_SAVED_AUDIO_VOLUME 0 ;;
 			2) SET_SAVED_AUDIO_VOLUME 35 ;;
 			3) SET_SAVED_AUDIO_VOLUME "$(GET_VAR "device" "audio/max")" ;;
-			*) ;;
 		esac
 	else
 		SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME)
-		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${SAVED_VOL}%"
+		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${SAVED_VOL}%" >/dev/null 2>&1
 		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Restored saved volume: %s%%" "$SAVED_VOL")"
 	fi
 
-	[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 
 	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "Audio Finalised (node=%s%s)" "$DEF_ID" "$([ -n "$RUNTIME_PERCENT" ] && printf ", runtime=%s%%" "$RUNTIME_PERCENT")")"
 	return 0
 }
 
-START_PIPEWIRE() {
-	RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" "/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
-
-	if ! pgrep -x "pipewire"; then
-		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Starting PipeWire (runtime: %s)" "$PIPEWIRE_RUNTIME_DIR")"
-		chrt -f 88 pipewire -c "$MUOS_SHARE_DIR/conf/pipewire.conf" &
-	else
-		LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire already running"
-	fi
-
-	if ! pgrep -x "wireplumber"; then
-		LOG_INFO "$0" 0 "PIPEWIRE" "Starting WirePlumber..."
-		wireplumber &
-	else
-		LOG_WARN "$0" 0 "PIPEWIRE" "WirePlumber already running"
-	fi
-
-	return 0
-}
-
-WAIT_FOR_DBUS() {
-	ELAPSED=0
-
-	while [ ! -S "$DBUS_SOCKET" ]; do
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-		[ "$ELAPSED" -ge "$TIMEOUT" ] && return 1
-	done
-
-	return 0
-}
-
-WAIT_FOR_PIPEWIRE() {
-	TARGET_ID=$(GET_TARGET_NODE)
-	ELAPSED=0
-
-	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		if SOCKET_READY; then
-			pw-dump 2>/dev/null | grep -q "$TARGET_ID" && return 0
-		fi
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-	done
-
-	LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Target node '%s' not ready after timeout" "$TARGET_ID")"
-	return 1
-}
-
 DO_START() {
-	[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
+	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
 
 	if ! START_PIPEWIRE; then
 		LOG_ERROR "$0" 0 "PIPEWIRE" "Failed to start"
-		[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		exit 1
 	fi
 
@@ -202,7 +234,7 @@ DO_START() {
 	RESTORE_CONF "$MUOS_SHARE_DIR/conf/alsa.conf" "/usr/share/alsa/alsa.conf"
 
 	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Audio State"
-	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore
+	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore >/dev/null 2>&1
 
 	RESET_MIXER
 
@@ -212,17 +244,20 @@ DO_START() {
 		LOG_WARN "$0" 0 "PIPEWIRE" "D-Bus not ready after timeout; proceeding"
 	fi
 
-	if ! WAIT_FOR_PIPEWIRE; then
-		LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire socket not ready after timeout"
-		[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+	if WAIT_FOR_PIPEWIRE_SOCKET; then
+		LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket is available (%s)" "$PW_SOCKET")"
+	else
+		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket '%s' not ready after timeout" "$PW_SOCKET")"
+		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		exit 1
 	fi
 
-	# Prevent loud pop or incorrect gain during restore
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
-
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 >/dev/null 2>&1
 	SET_SAVED_AUDIO_VOLUME "$(GET_SAVED_AUDIO_VOLUME)"
-	FINALISE_AUDIO
+
+	if ! FINALISE_AUDIO; then
+		exit 1
+	fi
 
 	exit 0
 }
@@ -230,48 +265,65 @@ DO_START() {
 DO_STOP() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Audio shutdown sequence..."
 
-	wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%
+	if SOCKET_READY; then
+		wpctl set-volume @DEFAULT_AUDIO_SINK@ 1% >/dev/null 2>&1
+	fi
 
-	for PROC in pipewire wireplumber; do
-		pkill -15 "$PROC" 2>/dev/null
-		PROC_GONE "$PROC" || pkill -9 "$PROC" 2>/dev/null
-	done
+	if PROC_RUNNING wireplumber; then
+		pkill -15 -x wireplumber 2>/dev/null
+		PROC_GONE wireplumber || pkill -9 -x wireplumber 2>/dev/null
+	fi
 
-	[ "$ADV_AR" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
+	if PROC_RUNNING pipewire; then
+		pkill -15 -x pipewire 2>/dev/null
+		PROC_GONE pipewire || pkill -9 -x pipewire 2>/dev/null
+	fi
+
+	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
 	LOG_SUCCESS "$0" 0 "PIPEWIRE" "Audio shutdown complete"
 }
 
 DO_RELOAD() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Reloading audio routing/volume"
 
-	if SOCKET_READY; then
-		if FINALISE_AUDIO; then
-			LOG_SUCCESS "$0" 0 "PIPEWIRE" "Reload complete"
-			exit 0
-		fi
+	if ! SOCKET_READY; then
+		LOG_WARN "$0" 0 "PIPEWIRE" "Reload incomplete (daemon/socket not ready)"
+		exit 1
 	fi
 
-	LOG_WARN "$0" 0 "PIPEWIRE" "Reload incomplete (daemon/socket not ready)"
+	if FINALISE_AUDIO; then
+		LOG_SUCCESS "$0" 0 "PIPEWIRE" "Reload complete"
+		exit 0
+	fi
+
+	LOG_WARN "$0" 0 "PIPEWIRE" "Reload incomplete"
 	exit 1
 }
 
 PRINT_STATUS() {
+	READY=$(GET_VAR "device" "audio/ready")
 	SOCK=0
 	SINK=0
 	PW_RUNNING=0
 	WP_RUNNING=0
+	DEF_SINK=
+	PW_PID=
+	WP_PID=
 
+	PROC_RUNNING pipewire && PW_RUNNING=1
+	PROC_RUNNING wireplumber && WP_RUNNING=1
 	SOCKET_READY && SOCK=1
-	pw-cli ls Node 2>/dev/null | grep -q "Audio/Sink" && SINK=1
-	pgrep -x "pipewire" >/dev/null 2>&1 && PW_RUNNING=1
-	pgrep -x "wireplumber" >/dev/null 2>&1 && WP_RUNNING=1
 
-	DEF_SINK=$(wpctl status 2>/dev/null | awk -F': ' '/Default Sink:/ {print $2; exit}')
-	PW_PID=$(pgrep -xo pipewire)
-	WP_PID=$(pgrep -xo wireplumber)
+	if [ "$SOCK" -eq 1 ]; then
+		pw-cli ls Node 2>/dev/null | grep -q "Audio/Sink" && SINK=1
+		DEF_SINK=$(wpctl status 2>/dev/null | awk -F': ' '/Default Sink:/ {print $2; exit}')
+	fi
 
-	printf "PipeWire:\t\t%s\n" "$([ "$PW_RUNNING" -eq 1 ] && printf "running\t\t%s" "$PW_PID" || printf "stopped")"
-	printf "WirePlumber:\t\t%s\n" "$([ "$WP_RUNNING" -eq 1 ] && printf "running\t\t%s" "$WP_PID" || printf "stopped")"
+	PW_PID=$(pgrep -o -x pipewire 2>/dev/null)
+	WP_PID=$(pgrep -o -x wireplumber 2>/dev/null)
+
+	printf "PipeWire:\t\t%s\n" "$([ "$PW_RUNNING" -eq 1 ] && printf "running\t\t%s" "${PW_PID:-unknown}" || printf "stopped")"
+	printf "WirePlumber:\t\t%s\n" "$([ "$WP_RUNNING" -eq 1 ] && printf "running\t\t%s" "${WP_PID:-unknown}" || printf "stopped")"
 	printf "Socket:\t\t\t%s\n" "$([ "$SOCK" -eq 1 ] && printf "ready\t\t%s" "$PW_SOCKET" || printf "not ready")"
 	printf "Audio Sink:\t\t%s%s\n" "$([ "$SINK" -eq 1 ] && printf "available" || printf "missing")" "$([ -n "$DEF_SINK" ] && printf " (default: %s)" "$DEF_SINK" || printf "")"
 	printf "MustardOS Ready:\t%s\n" "$([ "$READY" = "1" ] && printf "yes" || printf "no")"
@@ -282,7 +334,7 @@ PRINT_STATUS() {
 	return 1
 }
 
-case "$1" in
+case "${1:-}" in
 	start) DO_START ;;
 	stop) DO_STOP ;;
 	restart)
