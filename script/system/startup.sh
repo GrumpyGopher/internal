@@ -21,6 +21,11 @@ SET_VAR "system" "idle_inhibit" "0"
 SET_VAR "config" "boot/device_mode" "0"
 SET_VAR "device" "audio/ready" "0"
 
+#:] ### Start PipeWire Audio
+#:] Launch PipeWire and WirePlumber in one go.
+LOG_INFO "$0" 0 "BOOTING" "Starting Pipewire"
+/opt/muos/script/system/pipewire.sh start &
+
 #:] ### Set OS Release Metadata
 #:] Generate `/etc/os-release` and similar so services can report the right version.
 LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
@@ -56,11 +61,6 @@ NET_ASYNC=$(GET_VAR "config" "settings/network/async_load")
 #:] Primarily used for TrimUI/RK3326 devices at the moment.
 LOG_INFO "$0" 0 "BOOTING" "Enabling Device Rumble"
 /opt/muos/script/device/rumble.sh &
-
-#:] ### Start PipeWire Audio
-#:] Launch PipeWire and WirePlumber in one go.
-LOG_INFO "$0" 0 "BOOTING" "Starting Pipewire"
-/opt/muos/script/system/pipewire.sh start &
 
 #:] ### Set Default CPU Governor
 #:] Run the CPU at full performance during boot to shorten startup time.
