@@ -228,8 +228,10 @@ LOG_INFO "$0" 0 "BOOTING" "Starting Low Power Indicator"
 
 #:] ### USB Gadget
 #:] Bring up the configured USB function (adb _or_ mtp) unless disabled.
-LOG_INFO "$0" 0 "BOOTING" "Starting USB Function"
-[ "$USB_FUNCTION" -ne 0 ] && /opt/muos/script/system/usb_gadget.sh start &
+if [ "$USB_FUNCTION" -ne 0 ]; then
+	LOG_INFO "$0" 0 "BOOTING" "Starting USB Function"
+	/opt/muos/script/system/usb_gadget.sh start &
+fi
 
 #:] ### Device Controls
 #:] Apply device-specific control defaults for RetroArch, emulators, ports etc.
@@ -255,8 +257,10 @@ LOG_INFO "$0" 0 "BOOTING" "Running Catalogue Generator"
 #:] ### Pre-cache RetroArch assets
 #:] Touch common files into the page cache to speed up first launches.
 #:] This is disabled by default as it increases boot speed by ~3s.
-LOG_INFO "$0" 0 "BOOTING" "Precaching RetroArch System"
-[ "${RA_CACHE:-0}" -eq 1 ] && ionice -c idle /opt/muos/bin/vmtouch -tfb "$MUOS_SHARE_DIR/conf/preload.txt" &
+if [ "${RA_CACHE:-0}" -eq 1 ]; then
+	LOG_INFO "$0" 0 "BOOTING" "Precaching RetroArch System"
+	ionice -c idle /opt/muos/bin/vmtouch -tfb "$MUOS_SHARE_DIR/conf/preload.txt" &
+fi
 
 #:] ### Save kernel boot log
 #:] Persist `dmesg` for later diagnostics.
