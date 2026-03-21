@@ -17,19 +17,18 @@ CONFIG="$EMUDIR/.config/$APP_BIN/$APP_BIN.ini"
 LOGPATH="$(GET_VAR "device" "storage/rom/mount")/MUOS/log/$APP_BIN.log"
 SAVE="$MUOS_STORE_DIR/save/file/ScummVM-Ext"
 
-RG_DPAD="/sys/class/power_supply/axp2202-battery/nds_pwrkey"
-TUI_DPAD="/tmp/trimui_inputd/input_dpad_to_joystick"
-
 mkdir -p "$SAVE"
 chmod +x "$EMUDIR"/$APP_BIN
 
 cd "$EMUDIR" || exit
 
+DPAD_SWAP=$(GET_VAR "device" "input/swap")
+
 # Switch analogue<>dpad for stickless devices
 [ "$(GET_VAR "device" "board/stick")" -eq 0 ] && STICK_ROT=2 || STICK_ROT=0
 case "$(GET_VAR "device" "board/name")" in
-	rg*) echo "$STICK_ROT" >"$RG_DPAD" ;;
-	tui*) [ ! -f $TUI_DPAD ] && touch $TUI_DPAD ;;
+	rg*) echo "$STICK_ROT" >"$DPAD_SWAP" ;;
+	tui*) [ ! -f "$DPAD_SWAP" ] && touch "$DPAD_SWAP" ;;
 	*) ;;
 esac
 
@@ -38,7 +37,7 @@ HOME="$EMUDIR" ./$APP_BIN --logfile="$LOGPATH" --joystick=0 --config="$CONFIG"
 # Switch analogue<>dpad back so we can navigate muX
 [ "$(GET_VAR "device" "board/stick")" -eq 0 ]
 case "$(GET_VAR "device" "board/name")" in
-	rg*) echo "0" >"$RG_DPAD" ;;
-	tui*) [ -f $TUI_DPAD ] && rm $TUI_DPAD ;;
+	rg*) echo 0 >"$DPAD_SWAP" ;;
+	tui*) [ -f "$DPAD_SWAP" ] && rm -f "$DPAD_SWAP" ;;
 	*) ;;
 esac

@@ -26,19 +26,17 @@ if [ -d "$F_PATH/.$NAME" ]; then
 	SUBFOLDER="/.$NAME"
 elif [ -d "$F_PATH/_$NAME" ]; then
 	SUBFOLDER="/_$NAME"
-elif [[ "$F_PATH" == */"$NAME" || "$F_PATH" == */"$NAME".scummvm ]]; then
-	SUBFOLDER=""
 else
-	SUBFOLDER="/$NAME"
+	case "$F_PATH" in
+		*/"$NAME" | */"$NAME".scummvm) SUBFOLDER="" ;;
+		*) SUBFOLDER="/$NAME" ;;
+	esac
 fi
 
 EMUDIR="$MUOS_SHARE_DIR/emulator/scummvm"
 CONFIG="$EMUDIR/.config/scummvm/scummvm.ini"
 LOGPATH="$(GET_VAR "device" "storage/rom/mount")/MUOS/log/scummvm/log.txt"
 SAVE="$MUOS_STORE_DIR/save/file/ScummVM-Ext"
-
-RG_DPAD="/sys/class/power_supply/axp2202-battery/nds_pwrkey"
-TUI_DPAD="/tmp/trimui_inputd/input_dpad_to_joystick"
 
 # Create log folder if it doesn't exist
 mkdir -p "$(GET_VAR "device" "storage/rom/mount")/MUOS/log/scummvm"
@@ -92,11 +90,13 @@ case "$SCVM" in
 		;;
 esac
 
+DPAD_SWAP=$(GET_VAR "device" "input/swap")
+
 # Switch analogue<>dpad for stickless devices
 [ "$(GET_VAR "device" "board/stick")" -eq 0 ] && STICK_ROT=2 || STICK_ROT=0
 case "$(GET_VAR "device" "board/name")" in
-	rg*) echo "$STICK_ROT" >"$RG_DPAD" ;;
-	tui*) [ ! -f $TUI_DPAD ] && touch $TUI_DPAD ;;
+	rg*) echo "$STICK_ROT" >"$DPAD_SWAP" ;;
+	tui*) [ ! -f "$DPAD_SWAP" ] && touch "$DPAD_SWAP" ;;
 	*) ;;
 esac
 
@@ -109,7 +109,7 @@ HOME="$EMUDIR" ./scummvm --logfile="$LOGPATH" --joystick=0 --config="$CONFIG" -p
 # Switch analogue<>dpad back so we can navigate muX
 [ "$(GET_VAR "device" "board/stick")" -eq 0 ]
 case "$(GET_VAR "device" "board/name")" in
-	rg*) echo "0" >"$RG_DPAD" ;;
-	tui*) [ -f $TUI_DPAD ] && rm $TUI_DPAD ;;
+	rg*) echo 0 >"$DPAD_SWAP" ;;
+	tui*) [ -f "$DPAD_SWAP" ] && rm -f "$DPAD_SWAP" ;;
 	*) ;;
 esac

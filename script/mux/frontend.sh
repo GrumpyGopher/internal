@@ -4,6 +4,7 @@
 
 ROM_MOUNT=$(GET_VAR "device" "storage/rom/mount")
 BOARD_NAME=$(GET_VAR "device" "board/name")
+DPAD_SWAP=$(GET_VAR "device" "input/swap")
 
 STARTUP=$(GET_VAR "config" "settings/general/startup")
 AUDIO_READY=$(GET_VAR "config" "settings/advanced/audio_ready")
@@ -69,11 +70,8 @@ while :; do
 
 	# Reset ANALOGUE<>DIGITAL switch for the DPAD
 	case "$BOARD_NAME" in
-		rg*) echo 0 >"/sys/class/power_supply/axp2202-battery/nds_pwrkey" ;;
-		tui*)
-			DPAD_FILE="/tmp/trimui_inputd/input_dpad_to_joystick"
-			ENSURE_REMOVED "$DPAD_FILE"
-			;;
+		rg*) echo 0 >"$DPAD_SWAP" ;;
+		tui*) ENSURE_REMOVED "$DPAD_SWAP" ;;
 	esac
 
 	# Content Loader

@@ -8,6 +8,7 @@ LED_NORMAL="$(GET_VAR "device" "led/normal")"
 GOVERNOR="$(GET_VAR "device" "cpu/governor")"
 RUMBLE="$(GET_VAR "device" "board/rumble")"
 NET_STATE="$(GET_VAR "device" "network/state")"
+DPAD_SWAP=$(GET_VAR "device" "input/swap")
 
 USE_ACTIVITY="$(GET_VAR "config" "settings/advanced/activity")"
 USE_LEDS="$(GET_VAR "config" "settings/advanced/led")"
@@ -133,22 +134,22 @@ ENSURE_REMOVED "$FLT_GO"
 ENSURE_REMOVED "$OVL_GO"
 ENSURE_REMOVED "$RAC_GO"
 
-rm -f "$MUOS_RUN_DIR/overlay.filter"
+ENSURE_REMOVED "$MUOS_RUN_DIR/overlay.filter"
+ENSURE_REMOVED "$MUOS_RUN_DIR/overlay.shader"
 
 killall -9 "gptokeyb" "gptokeyb2" >/dev/null 2>&1
 
-case "$BOARD_NAME" in
-	rg*)
-		echo 0 >"/sys/class/power_supply/axp2202-battery/nds_pwrkey"
-		echo 1 >"$LED_NORMAL"
-		echo 1 >"$LED_STATE"
-		;;
-	tui*)
-		DPAD_FILE="/tmp/trimui_inputd/input_dpad_to_joystick"
-		ENSURE_REMOVED "$DPAD_FILE"
-		;;
-	*) ;;
-esac
+if [ "$(GET_VAR "device" "board/stick")" -eq 0 ]; then
+	case "$BOARD_NAME" in
+		rg*)
+			echo 0 >"$DPAD_SWAP"
+			echo 1 >"$LED_NORMAL"
+			echo 1 >"$LED_STATE"
+			;;
+		tui*) ENSURE_REMOVED "$DPAD_SWAP" ;;
+		*) ;;
+	esac
+fi
 
 SCREEN_TYPE="internal"
 [ "$DEV_MODE" -eq 1 ] && SCREEN_TYPE="external"
