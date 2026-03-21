@@ -172,8 +172,7 @@ SET_SAVED_AUDIO_VOLUME() {
 
 RESTORE_AUDIO_VOLUME() {
 	RESET_MIXER
-
-	SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME) || return 1
+	SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME)
 
 	for _ in 1 2 3 4 5 6 7 8 9 10; do
 		wpctl inspect @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
@@ -188,6 +187,7 @@ SET_DEFAULT_GOVERNOR() {
 	(
 		DEF_GOV=$(GET_VAR "device" "cpu/default")
 		printf "%s" "$DEF_GOV" >"$(GET_VAR "device" "cpu/governor")"
+
 		if [ "$DEF_GOV" = ondemand ]; then
 			GET_VAR "device" "cpu/min_freq_default" >"$(GET_VAR "device" "cpu/min_freq")"
 			GET_VAR "device" "cpu/max_freq_default" >"$(GET_VAR "device" "cpu/max_freq")"
