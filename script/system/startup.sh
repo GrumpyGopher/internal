@@ -21,6 +21,11 @@ SET_VAR "system" "idle_inhibit" "0"
 SET_VAR "config" "boot/device_mode" "0"
 SET_VAR "device" "audio/ready" "0"
 
+#:] ### Battery Watchdog
+#:] Start the battery watchdog that helps with voltage calibration.
+LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
+BATTERY start
+
 #:] ### Start PipeWire Audio
 #:] Launch PipeWire and WirePlumber in one go.
 LOG_INFO "$0" 0 "BOOTING" "Starting Pipewire"
@@ -173,11 +178,6 @@ until [ -f "$MUOS_STORE_DIR/mount_ready" ]; do sleep 0.01; done
 LOG_INFO "$0" 0 "BOOTING" "Checking for Safety Script"
 OOPS="$ROM_MOUNT/oops.sh"
 [ -x "$OOPS" ] && "$OOPS" && rm -f "$OOPS"
-
-#:] ### Battery Watchdog
-#:] Start the battery watchdog that helps with voltage calibration.
-LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
-BATTERY start
 
 #:] ### Detect Charging Mode (_handheld mode only_)
 #:] On internal display mode, detect charger state and adjust LEDs accordingly.
