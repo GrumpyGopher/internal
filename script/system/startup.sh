@@ -179,6 +179,11 @@ LOG_INFO "$0" 0 "BOOTING" "Checking for Safety Script"
 OOPS="$ROM_MOUNT/oops.sh"
 [ -x "$OOPS" ] && "$OOPS" && rm -f "$OOPS"
 
+#:] ### Storage Authenticity Check
+#:] Quickly check the storage devices for authenticity
+LOG_INFO "$0" 0 "BOOTING" "Storage Authenticity Check"
+/opt/muos/script/system/checkmsd.sh &
+
 #:] ### Detect Charging Mode (_handheld mode only_)
 #:] On internal display mode, detect charger state and adjust LEDs accordingly.
 if [ "${CONSOLE_MODE:-0}" -eq 0 ]; then
