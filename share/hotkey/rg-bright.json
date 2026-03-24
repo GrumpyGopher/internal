@@ -15,7 +15,7 @@
   "BRIGHT_DOWN": {
     "handle_hold": true,
     "inputs": [
-      "MENU_LONG",
+      "MENU",
       "VOL_DOWN"
     ],
     "is_handheld_mode": true,
@@ -25,7 +25,7 @@
   "BRIGHT_UP": {
     "handle_hold": true,
     "inputs": [
-      "MENU_LONG",
+      "MENU",
       "VOL_UP"
     ],
     "is_handheld_mode": true,

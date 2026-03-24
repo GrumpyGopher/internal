@@ -6,7 +6,7 @@
     "handle_hold": false,
     "inputs": [
       "LS_DOWN",
-      "MENU_LONG"
+      "MENU"
     ],
     "is_handheld_mode": true,
     "is_normal_mode": true
@@ -15,7 +15,7 @@
     "handle_hold": false,
     "inputs": [
       "LS_UP",
-      "MENU_LONG"
+      "MENU"
     ],
     "is_handheld_mode": true,
     "is_normal_mode": true
@@ -24,7 +24,7 @@
     "handle_hold": false,
     "inputs": [
       "LS_RIGHT",
-      "MENU_LONG"
+      "MENU"
     ],
     "is_handheld_mode": true,
     "is_normal_mode": true
@@ -33,7 +33,7 @@
     "handle_hold": false,
     "inputs": [
       "LS_LEFT",
-      "MENU_LONG"
+      "MENU"
     ],
     "is_handheld_mode": true,
     "is_normal_mode": true
@@ -42,7 +42,7 @@
     "handle_hold": false,
     "inputs": [
       "L3",
-      "MENU_LONG"
+      "MENU"
     ],
     "is_handheld_mode": true,
     "is_normal_mode": true

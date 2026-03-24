@@ -8,7 +8,7 @@
       "VOL_DOWN"
     ],
     "negate": [
-      "MENU_SHORT"
+      "MENU"
     ],
     "run_command": "/opt/muos/script/device/audio.sh D"
   },
@@ -18,7 +18,7 @@
       "VOL_UP"
     ],
     "negate": [
-      "MENU_SHORT"
+      "MENU"
     ],
     "run_command": "/opt/muos/script/device/audio.sh U"
   }
