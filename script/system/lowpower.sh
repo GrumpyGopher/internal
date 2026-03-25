@@ -2,9 +2,7 @@
 
 . /opt/muos/script/var/func.sh
 
-IS_IDLE="$MUOS_RUN_DIR/is_idle"
-BATT_OVERLAY="$MUOS_RUN_DIR/overlay.battery"
-
+BATT_OVL="$MUOS_RUN_DIR/overlay.battery"
 BATT_CAP="$MUOS_RUN_DIR/battery/capacity"
 BATT_CHG="$MUOS_RUN_DIR/battery/charging"
 
@@ -29,7 +27,7 @@ LOW_BATTERY_WARNING() {
 
 	if [ "$CHARGING" -ne 0 ] || [ "$CAPACITY" -gt "$(GET_VAR "config" "settings/power/low_battery")" ]; then
 		if [ "$OVERLAY_ACTIVE" -eq 1 ]; then
-			rm -f "$BATT_OVERLAY"
+			rm -f "$BATT_OVL"
 			echo 0 >"$LED_LOW"
 			OVERLAY_ACTIVE=0
 		fi
@@ -37,7 +35,7 @@ LOW_BATTERY_WARNING() {
 	fi
 
 	if [ "$OVERLAY_ACTIVE" -eq 0 ]; then
-		touch "$BATT_OVERLAY"
+		touch "$BATT_OVL"
 		echo 1 >"$LED_LOW"
 		OVERLAY_ACTIVE=1
 
