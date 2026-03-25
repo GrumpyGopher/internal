@@ -6,7 +6,7 @@
   "BRIGHT_DOWN": {
     "handle_hold": true,
     "inputs": [
-      "SWITCH",
+      "MENU",
       "VOL_DOWN"
     ],
     "is_normal_mode": true,
@@ -15,7 +15,7 @@
   "BRIGHT_UP": {
     "handle_hold": true,
     "inputs": [
-      "SWITCH",
+      "MENU",
       "VOL_UP"
     ],
     "is_normal_mode": true,
