@@ -628,6 +628,8 @@ DISPLAY_IDLE() {
 
 	[ -f "$LED_CONTROL_SCRIPT" ] && "$LED_CONTROL_SCRIPT" 1 0 0 0 0 0 0 0
 
+	printf 1 >"$IDLE_STATE"
+
 	: >"$IS_IDLE"
 }
 
