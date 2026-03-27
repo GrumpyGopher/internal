@@ -15,7 +15,6 @@ DNS_ADDR=$(GET_VAR "config" "network/dns")
 
 NET_COMPAT=$(GET_VAR "config" "settings/network/compat")
 MAX_WAIT=$(GET_VAR "config" "settings/network/wait_timer")
-MAX_RETRY=$(GET_VAR "config" "settings/network/compat_retry")
 
 # Ensure network interface is never blank at the start...
 [ -n "$NET_IFACE" ] || NET_IFACE=$(GET_VAR "device" "network/iface_active")
@@ -91,18 +90,28 @@ LOAD_NETWORK() {
 
 	case "$BOARD_NAME" in
 		rg*)
-			modprobe -qf "$NET_NAME"
+			if ! grep -qw "^$NET_NAME" /proc/modules; then
+				modprobe -qf "$NET_NAME"
+			fi
 			;;
 		mgx* | tui*)
 			# Can't "force" the module to load on TrimUI devices because otherwise it gets cranky
-			modprobe -q "$NET_NAME"
+			if ! grep -qw "^$NET_NAME" /proc/modules; then
+				modprobe -q "$NET_NAME"
+			fi
 			;;
 		rk*)
 			# For USB WiFi adapters using 'wext' extensions, ensure cfg80211
 			# is loaded first if it exists (might be built-in or not needed)
 			modprobe -q cfg80211
+			if [ -n "$NET_NAME" ] && ! grep -qw "^$NET_NAME" /proc/modules; then
+				modprobe -q "$NET_NAME"
+			fi
 			;;
 	esac
+
+	# We'll just wait a moment for those network modules who are a bit slow...
+	sleep 1
 
 	# On certain devices we have to actually wait for the SDIO controller
 	# to finish initialising because, that's right, the Wi-Fi chip is
@@ -126,6 +135,8 @@ LOAD_NETWORK() {
 
 	# Bring the interface up and disable Wi-Fi powersave if phy80211 present
 	ip link set "$NET_IFACE" up
+	sleep 1
+
 	[ -L "$SCN_PATH/$NET_IFACE/phy80211" ] && iw dev "$NET_IFACE" set power_save off
 
 	# Only touch resolv.conf if we actually have a DNS to set
@@ -140,43 +151,52 @@ LOAD_NETWORK() {
 UNLOAD_NETWORK() {
 	[ "$HAS_NETWORK" -eq 0 ] && return 0
 
-	[ -n "$NET_IFACE" ] && {
+	if [ -n "$NET_IFACE" ] && [ -d "$SCN_PATH/$NET_IFACE" ]; then
 		iw dev "$NET_IFACE" disconnect
+		iw dev "$NET_IFACE" set power_save off
+		ip addr flush dev "$NET_IFACE"
+		ip route del default dev "$NET_IFACE"
 		ip link set "$NET_IFACE" down
-	}
+	fi
+
+	killall -q wpa_supplicant dhcpcd udhcpc
+	sleep 2
 
 	if grep -qw "^$NET_NAME" /proc/modules; then
 		modprobe -qr "$NET_NAME"
-		sleep 1
+		sleep 2
 	fi
 
 	case "$BOARD_NAME" in
 		mgx* | tui*)
 			# Remove the stupid leftover xradio modules
-			modprobe -qr "xradio_mac"
+			if grep -qw "^xradio_mac" /proc/modules; then
+				modprobe -qr "xradio_mac"
+				sleep 1
+			fi
+			if grep -qw "^xradio_core" /proc/modules; then
+				modprobe -qr "xradio_core"
+				sleep 1
+			fi
+			if grep -qw "^xradio_wlan" /proc/modules; then
+				modprobe -qr "xradio_wlan"
+				sleep 1
+			fi
 			;;
 	esac
 
 	[ -f "$RESOLV_CONF.bak" ] && mv -f "$RESOLV_CONF.bak" "$RESOLV_CONF"
+
+	return 0
 }
 
 RELOAD_NETWORK() {
 	[ "$HAS_NETWORK" -eq 0 ] && return 0
 
-	# We reload the driver a couple of times because sometimes the
-	# RTL really wants to sleep.  It's okay to bully the hardware!
-	I=0
-	while [ "$I" -lt "$MAX_RETRY" ]; do
-		UNLOAD_NETWORK
-		sleep 1
+	UNLOAD_NETWORK
+	sleep 2
 
-		LOAD_NETWORK && return 0
-
-		I=$((I + 1))
-	done
-
-	sleep 1
-	return 1
+	LOAD_NETWORK
 }
 
 if [ "$FACTORY_RESET" -eq 0 ]; then
