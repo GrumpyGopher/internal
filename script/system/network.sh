@@ -72,6 +72,50 @@ CALCULATE_IAID() {
 	LOG_INFO "$0" 0 "NETWORK" "$(printf "Using IAID: %s" "$IAID")"
 }
 
+WAIT_FOR_MODULE() {
+	MOD="$1"
+	TIMEOUT="${2:-5}"
+
+	I=0
+	while [ "$I" -lt "$TIMEOUT" ]; do
+		grep -qw "^$MOD" /proc/modules && return 0
+		I=$((I + 1))
+		sleep 1
+	done
+
+	return 1
+}
+
+WAIT_FOR_IFACE() {
+	IFACE="$1"
+	TIMEOUT="${2:-5}"
+
+	I=0
+	while [ "$I" -lt "$TIMEOUT" ]; do
+		[ -d "/sys/class/net/$IFACE" ] && return 0
+		I=$((I + 1))
+		sleep 1
+	done
+
+	return 1
+}
+
+WAIT_FOR_IFACE_READY() {
+	IFACE="$1"
+	TIMEOUT="${2:-5}"
+
+	I=0
+	while [ "$I" -lt "$TIMEOUT" ]; do
+		if ip link set "$IFACE" up 2>/dev/null; then
+			return 0
+		fi
+		I=$((I + 1))
+		sleep 1
+	done
+
+	return 1
+}
+
 # Exterminate!
 DESTROY_DHCPCD() {
 	# Only pay the ferry man if there is actually something to kill!
@@ -79,11 +123,8 @@ DESTROY_DHCPCD() {
 		killall -q dhcpcd udhcpc wpa_supplicant 2>/dev/null
 		sleep 1
 		killall -9 dhcpcd udhcpc wpa_supplicant 2>/dev/null
+		sleep 1
 	fi
-
-	LOG_INFO "$0" 0 "NETWORK" "Clearing Previous DHCP Addresses"
-	rm -rf /var/db/dhcpcd/*
-	mkdir -p /var/db/dhcpcd
 }
 
 # Determine if the SSID appears in scan results
@@ -138,6 +179,15 @@ WAIT_NETWORK_ASSOC() {
 				;;
 		esac
 
+		if WPA_RUNNING; then
+			:
+		else
+			if [ -n "$PASS" ]; then
+				LOG_ERROR "$0" 0 "NETWORK" "wpa_supplicant exited before association completed"
+				FAIL_WITH "AUTH_TIMEOUT" "$RC_AUTH_TIMEOUT"
+			fi
+		fi
+
 		LOG_WARN "$0" 0 "NETWORK" "$(printf "Waiting for WiFi Association... (%ds)" "$WAIT")"
 		WAIT=$((WAIT - 1))
 		sleep 1
@@ -146,8 +196,7 @@ WAIT_NETWORK_ASSOC() {
 	LOG_ERROR "$0" 0 "NETWORK" "Association timeout"
 
 	# If wpa_supplicant is running on this iface, treat as auth timeout/bad
-	if pgrep -f "wpa_supplicant.*-i[[:space:]]*$IFCE" >/dev/null 2>&1 ||
-		pgrep -f "wpa_supplicant.*$IFCE" >/dev/null 2>&1; then
+	if [ -n "$PASS" ]; then
 		FAIL_WITH "AUTH_TIMEOUT" "$RC_AUTH_TIMEOUT"
 	fi
 
@@ -176,32 +225,11 @@ WPA_RUNNING() {
 WIFI_CONFIG() {
 	[ "$IFCE" = "eth0" ] && return 0
 
-	SSID_PRESENT
-
-	RC=$?
-	if [ "$RC" -eq 1 ]; then
-		LOG_ERROR "$0" 0 "NETWORK" "$(printf "SSID not found: %s" "$SSID")"
-		FAIL_WITH "AP_NOT_FOUND" "$RC_AP_NOT_FOUND"
-	elif [ "$RC" -eq 2 ]; then
-		LOG_WARN "$0" 0 "NETWORK" "WiFi scan failed (continuing)"
-	fi
-
 	LOG_INFO "$0" 0 "NETWORK" "$(printf "Setting ESSID: %s" "$SSID")"
-	if iw dev "$IFCE" info >/dev/null 2>&1; then
-		iwconfig "$IFCE" essid -- "$SSID" 2>/dev/null
-	fi
 
 	OPEN=0
 	if [ -z "$PASS" ]; then
-		IS_OPEN_NETWORK
-		RC=$?
-		if [ "$RC" -eq 0 ]; then
-			OPEN=1
-		elif [ "$RC" -eq 2 ]; then
-			OPEN=0
-		else
-			OPEN=0
-		fi
+		OPEN=1
 	fi
 
 	if [ -n "$PASS" ] || [ "$OPEN" -eq 0 ]; then
@@ -212,22 +240,6 @@ WIFI_CONFIG() {
 
 		NET_STATUS "AUTHENTICATING"
 		/opt/muos/script/web/password.sh
-
-		# Pin BSSID (best effort anyway)
-		BEST_BSSID=$(
-			iw dev "$IFCE" scan 2>/dev/null |
-				awk -v ssid="$SSID" '
-				/BSS/ { b=$2 }
-				/SSID:/ { s=$2 }
-				s==ssid && /SSID:/ { sub(/[\(\)]/,"",b); print b; exit }
-			'
-		)
-
-		sed -i '/^bssid=/d' "$WPA_CONFIG" 2>/dev/null
-		[ -n "$BEST_BSSID" ] && {
-			LOG_INFO "$0" 0 "NETWORK" "$(printf "Pinning BSSID: %s" "$BEST_BSSID")"
-			sed -i "/^ssid=/i bssid=$BEST_BSSID" "$WPA_CONFIG" 2>/dev/null
-		}
 
 		case "$DRIV" in
 			wext)
@@ -246,12 +258,10 @@ WIFI_CONFIG() {
 				;;
 		esac
 	else
-		# For those who enjoy connecting to an open network...
-		if iw dev "$IFCE" info >/dev/null 2>&1; then
-			LOG_INFO "$0" 0 "NETWORK" "Connecting to open network"
-			iwconfig "$IFCE" mode Managed 2>/dev/null
-			iwconfig "$IFCE" key off 2>/dev/null
-		fi
+		LOG_INFO "$0" 0 "NETWORK" "Connecting to open network"
+		iwconfig "$IFCE" mode Managed 2>/dev/null
+		iwconfig "$IFCE" essid -- "$SSID" 2>/dev/null
+		iwconfig "$IFCE" key off 2>/dev/null
 	fi
 
 	NET_STATUS "ASSOCIATING"
@@ -341,21 +351,22 @@ TRY_CONNECT() {
 	[ -z "$SSID" ] && [ "$IFCE" != "eth0" ] && return 0
 
 	rfkill unblock all 2>/dev/null
-	iw dev "$IFCE" set power_save off 2>/dev/null
 
 	RESTORE_HOSTNAME
 	DESTROY_DHCPCD
 
-	iw dev "$IFCE" disconnect 2>/dev/null
-	ip addr flush dev "$IFCE" 2>/dev/null
-	ip route del default dev "$IFCE" 2>/dev/null
+	if [ -d "/sys/class/net/$IFCE" ]; then
+		CALCULATE_IAID
 
-	CALCULATE_IAID
+		iw dev "$IFCE" disconnect 2>/dev/null
+		ip addr flush dev "$IFCE" 2>/dev/null
+		ip route del default dev "$IFCE" 2>/dev/null
+		ip link set dev "$IFCE" up 2>/dev/null || FAIL_WITH "FAILED" "$RC_FAIL"
+		iw dev "$IFCE" set power_save off 2>/dev/null
+	else
+		FAIL_WITH "FAILED" "$RC_FAIL"
+	fi
 
-	ip link set dev "$IFCE" down 2>/dev/null
-	sleep 1
-
-	ip link set dev "$IFCE" up 2>/dev/null || FAIL_WITH "FAILED" "$RC_FAIL"
 	sleep 1
 
 	WIFI_CONFIG || return $?
@@ -402,7 +413,27 @@ case "$1" in
 		NET_STATUS "ASSOCIATING"
 
 		RETRY_CURR=0
+		RELOAD_DONE=0
+
 		while [ "$RETRY_CURR" -lt "$RETRIES" ]; do
+			# Ensure module and interface are actually ready before trying anything...
+			NET_NAME=$(GET_VAR "device" "network/name")
+
+			if [ -n "$NET_NAME" ]; then
+				WAIT_FOR_MODULE "$NET_NAME" 5
+			fi
+
+			if ! WAIT_FOR_IFACE "$IFCE" 5; then
+				LOG_WARN "$0" 0 "NETWORK" "Interface not found, attempting reload"
+				/opt/muos/script/device/network.sh reload
+				sleep 2
+			fi
+
+			if ! WAIT_FOR_IFACE_READY "$IFCE" 5; then
+				LOG_ERROR "$0" 0 "NETWORK" "Interface not ready"
+				FAIL_WITH "FAILED" "$RC_FAIL"
+			fi
+
 			TRY_CONNECT
 			RC=$?
 
@@ -450,6 +481,13 @@ case "$1" in
 					exit 1
 					;;
 			esac
+
+			if [ ! -d "/sys/class/net/$IFCE" ] && [ "$RELOAD_DONE" -eq 0 ]; then
+				LOG_WARN "$0" 0 "NETWORK" "Interface missing, reloading network driver once"
+				/opt/muos/script/device/network.sh reload
+				RELOAD_DONE=1
+				sleep 2
+			fi
 
 			RETRY_CURR=$((RETRY_CURR + 1))
 			LOG_WARN "$0" 0 "NETWORK" "$(printf "Retrying Network Connection (%s/%s)" "$RETRY_CURR" "$RETRIES")"
