@@ -1,0 +1,13 @@
+{
+  "devices": [
+    "rg34xx-sp",
+    "rg35xx-sp"
+  ],
+  "SLEEP_SHORT": {
+    "handle_hold": false,
+    "inputs": [
+      "LID_CLOSE"
+    ],
+    "is_normal_mode": true
+  }
+}
