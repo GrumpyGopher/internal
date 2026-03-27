@@ -4,7 +4,7 @@
 
 if [ "$(GET_VAR "device" "board/stick")" -eq 0 ] && [ "$(GET_VAR "config" "settings/advanced/dpad_swap")" -eq 1 ]; then
 	RUMBLE_DEVICE="$(GET_VAR "device" "board/rumble")"
-	DPAD_SWAP=$(GET_VAR "device" "input/swap")
+	DPAD_SWAP=$(GET_VAR "device" "board/swap")
 
 	case "$(GET_VAR "system" "foreground_process")" in
 		mux*) ;;

@@ -8,7 +8,7 @@ LED_NORMAL="$(GET_VAR "device" "led/normal")"
 GOVERNOR="$(GET_VAR "device" "cpu/governor")"
 RUMBLE="$(GET_VAR "device" "board/rumble")"
 NET_STATE="$(GET_VAR "device" "network/state")"
-DPAD_SWAP=$(GET_VAR "device" "input/swap")
+DPAD_SWAP=$(GET_VAR "device" "board/swap")
 
 USE_ACTIVITY="$(GET_VAR "config" "settings/advanced/activity")"
 USE_LEDS="$(GET_VAR "config" "settings/advanced/led")"

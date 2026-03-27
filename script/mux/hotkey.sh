@@ -45,7 +45,7 @@ HANDLE_HOTKEY() {
 LID_CLOSED() {
 	case "$BOARD_NAME" in
 		rg34xx-sp | rg35xx-sp)
-			HALL_KEY="/sys/class/power_supply/axp2202-battery/hallkey"
+			HALL_KEY="$(cat "$(GET_VAR "device" "board/hall")")"
 			read -r VAL <"$HALL_KEY" 2>/dev/null || return 1
 			[ "$VAL" -eq 0 ]
 			;;

@@ -5,7 +5,7 @@
 QUIT_LID_PROC="$MUOS_RUN_DIR/quit_lid_proc"
 PID_FILE="$MUOS_RUN_DIR/lid.pid"
 
-HALL_KEY="/sys/class/power_supply/axp2202-battery/hallkey"
+HALL_KEY="$(cat "$(GET_VAR "device" "board/hall")")"
 
 LID_ENABLE=0
 HALL_STATE=1

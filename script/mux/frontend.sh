@@ -4,7 +4,7 @@
 
 ROM_MOUNT=$(GET_VAR "device" "storage/rom/mount")
 BOARD_NAME=$(GET_VAR "device" "board/name")
-DPAD_SWAP=$(GET_VAR "device" "input/swap")
+DPAD_SWAP=$(GET_VAR "device" "board/swap")
 
 STARTUP=$(GET_VAR "config" "settings/general/startup")
 AUDIO_READY=$(GET_VAR "config" "settings/advanced/audio_ready")

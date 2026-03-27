@@ -22,7 +22,7 @@ chmod +x "$EMUDIR"/$APP_BIN
 
 cd "$EMUDIR" || exit
 
-DPAD_SWAP=$(GET_VAR "device" "input/swap")
+DPAD_SWAP=$(GET_VAR "device" "board/swap")
 
 # Switch analogue<>dpad for stickless devices
 [ "$(GET_VAR "device" "board/stick")" -eq 0 ] && STICK_ROT=2 || STICK_ROT=0
