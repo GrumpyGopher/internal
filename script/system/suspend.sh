@@ -127,7 +127,7 @@ SLEEP() {
 	esac
 
 	if [ "$HAS_NETWORK" -eq 1 ]; then
-		nohup /opt/muos/script/system/network.sh disconnect >/dev/null 2>&1 &
+		/opt/muos/script/system/network.sh disconnect
 	fi
 
 	/opt/muos/script/device/module.sh unload
@@ -159,8 +159,8 @@ RESUME() {
 	# Network module must be loaded before attempting reconnect
 	wait "$MODULE_PID"
 
-	if [ "$HAS_NETWORK" -eq 1 ]; then
-		[ "$CONNECT_ON_WAKE" -eq 1 ] && nohup /opt/muos/script/system/network.sh connect >/dev/null 2>&1 &
+	if [ "$HAS_NETWORK" -eq 1 ] && [ "$CONNECT_ON_WAKE" -eq 1 ]; then
+		/opt/muos/script/system/network.sh connect &
 	fi
 
 	ACTIVITY_TRACKER resume &
