@@ -32,10 +32,6 @@ SD_PID=$!
 # Wait only for the mounts required by the boot process to become available
 wait $ROM_PID $SD_PID
 
-# We're all set for our device storage at least for now so we'll run
-# the union script to merge all of the potential content directories.
-/opt/muos/script/mount/union.sh start
-
 # Set up bind mounts under /run/muos/storage. Creates /run/muos/storage/mounted
 # upon completion to unblock the rest of the boot process.
 /opt/muos/script/mount/bind.sh &
