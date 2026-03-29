@@ -49,10 +49,7 @@ RESTORE_CONF() {
 	DST=$2
 
 	[ -f "$SRC" ] || return 1
-
-	if [ -f "$DST" ] && cmp -s "$SRC" "$DST"; then
-		return 0
-	fi
+	[ -f "$DST" ] && cmp -s "$SRC" "$DST" && return 0
 
 	cp -f "$SRC" "$DST"
 }
@@ -97,10 +94,7 @@ WAIT_FOR_PIPEWIRE_SOCKET() {
 	ELAPSED=0
 
 	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		if SOCKET_READY; then
-			return 0
-		fi
-
+		SOCKET_READY && return 0
 		sleep 0.1
 		ELAPSED=$((ELAPSED + INTERVAL))
 	done
@@ -124,23 +118,25 @@ WAIT_FOR_TARGET_NODE() {
 }
 
 GET_BOOT_RUNTIME_PERCENT() {
-	V=
-
-	case "$ADV_VOL" in
-		3) V=100 ;;
-		2) V=35 ;;
-		1) V=0 ;;
-	esac
-
 	if [ "${BOOT_CONSOLE_MODE:-0}" -eq 1 ]; then
-		if [ "${ADV_OD:-0}" -eq 1 ]; then
-			V=200
-		else
-			V=100
-		fi
+		[ "${ADV_OD:-0}" -eq 1 ] && printf "200\n" || printf "100\n"
+		return 0
 	fi
 
-	printf "%s\n" "$V"
+	case "$ADV_VOL" in
+		1) printf "0\n" ;;
+		2) printf "35\n" ;;
+		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
+	esac
+}
+
+GET_BOOT_SAVED_VOLUME() {
+	case "$ADV_VOL" in
+		1) printf "0\n" ;;
+		2) printf "35\n" ;;
+		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
+		*) GET_SAVED_AUDIO_VOLUME ;;
+	esac
 }
 
 START_PIPEWIRE() {
@@ -176,7 +172,10 @@ START_PIPEWIRE() {
 FINALISE_AUDIO() {
 	TARGET_NAME=$(GET_TARGET_NODE)
 	RUNTIME_PERCENT=$(GET_BOOT_RUNTIME_PERCENT)
+	SAVED_VOL=$(GET_BOOT_SAVED_VOLUME)
 	DEF_ID=
+
+	SET_SAVED_AUDIO_VOLUME "$SAVED_VOL"
 
 	if ! WAIT_FOR_TARGET_NODE "$TARGET_NAME"; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Target node '%s' not ready after timeout" "$TARGET_NAME")"
@@ -198,23 +197,12 @@ FINALISE_AUDIO() {
 	sleep 0.1
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
 
-	if [ -n "$RUNTIME_PERCENT" ]; then
-		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${RUNTIME_PERCENT}%" >/dev/null 2>&1
-
-		case "$ADV_VOL" in
-			1) SET_SAVED_AUDIO_VOLUME 0 ;;
-			2) SET_SAVED_AUDIO_VOLUME 35 ;;
-			3) SET_SAVED_AUDIO_VOLUME "$(GET_VAR "device" "audio/max")" ;;
-		esac
-	else
-		SAVED_VOL=$(GET_SAVED_AUDIO_VOLUME)
-		wpctl set-volume @DEFAULT_AUDIO_SINK@ "${SAVED_VOL}%" >/dev/null 2>&1
-		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Restored saved volume: %s%%" "$SAVED_VOL")"
-	fi
+	APPLY_VOL=${RUNTIME_PERCENT:-$SAVED_VOL}
+	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${APPLY_VOL}%" >/dev/null 2>&1
 
 	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 
-	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "Audio Finalised (node=%s%s)" "$DEF_ID" "$([ -n "$RUNTIME_PERCENT" ] && printf ", runtime=%s%%" "$RUNTIME_PERCENT")")"
+	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "Audio Finalised (node=%s, volume=%s%%)" "$DEF_ID" "$APPLY_VOL")"
 	return 0
 }
 
@@ -253,7 +241,6 @@ DO_START() {
 	fi
 
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 >/dev/null 2>&1
-	SET_SAVED_AUDIO_VOLUME "$(GET_SAVED_AUDIO_VOLUME)"
 
 	if ! FINALISE_AUDIO; then
 		exit 1
@@ -343,15 +330,11 @@ case "${1:-}" in
 		;;
 	reload) DO_RELOAD ;;
 	status)
-		if PRINT_STATUS; then
-			exit 0
-		else
-			EC=$?
-			exit "$EC"
-		fi
+		PRINT_STATUS
+		exit "$?"
 		;;
 	*)
-		printf "Usage: %s {start|stop|restart|reload|status}\n" "$0"
+		printf "Usage: %s {start | stop | restart | reload | status}\n" "$0"
 		exit 1
 		;;
 esac
