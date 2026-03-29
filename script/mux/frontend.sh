@@ -69,10 +69,13 @@ while :; do
 	killall -9 "gptokeyb" "gptokeyb2" >/dev/null 2>&1
 
 	# Reset ANALOGUE<>DIGITAL switch for the DPAD
-	case "$BOARD_NAME" in
-		rg*) echo 0 >"$DPAD_SWAP" ;;
-		tui*) ENSURE_REMOVED "$DPAD_SWAP" ;;
-	esac
+	if [ "$(GET_VAR "device" "board/stick")" -eq 0 ]; then
+		case "$BOARD_NAME" in
+			rg*) echo 0 >"$DPAD_SWAP" ;;
+			tui*) ENSURE_REMOVED "$DPAD_SWAP" ;;
+			*) ;;
+		esac
+	fi
 
 	# Content Loader
 	LOG_INFO "$0" 0 "FRONTEND" "Checking for Content Loader"
