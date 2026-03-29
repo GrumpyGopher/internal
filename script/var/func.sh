@@ -525,56 +525,73 @@ RUMBLE() {
 }
 
 FB_SWITCH() {
-	WIDTH="$1"
-	HEIGHT="$2"
-	DEPTH="$3"
+	FB_WIDTH="${1}"
+	FB_HEIGHT="${2}"
+	FB_DEPTH="${3}"
 
-	for MODE in screen mux; do
-		SET_VAR "device" "$MODE/width" "$WIDTH"
-		SET_VAR "device" "$MODE/height" "$HEIGHT"
+	for FB_MODE in screen mux; do
+		SET_VAR "device" "${FB_MODE}/width" "${FB_WIDTH}"
+		SET_VAR "device" "${FB_MODE}/height" "${FB_HEIGHT}"
 	done
 
-	if [ "$(cat "$(GET_VAR "device" "screen/hdmi")")" -eq 0 ] && [ "$(GET_VAR "device" "board/name")" = "rg28xx-h" ]; then
-		TMP_W="$WIDTH"
-		WIDTH="$HEIGHT"
-		HEIGHT="$TMP_W"
+	HDMI_NODE="$(GET_VAR "device" "screen/hdmi")"
+	FB_ACTUAL_WIDTH="${FB_WIDTH}"
+	FB_ACTUAL_HEIGHT="${FB_HEIGHT}"
+
+	if [ "$(GET_VAR "device" "board/name")" = "rg28xx-h" ]; then
+		HDMI_NODE_VAL=0
+		if [ -r "${HDMI_NODE}" ]; then
+			IFS= read -r HDMI_NODE_VAL <"${HDMI_NODE}"
+		fi
+		if [ "${HDMI_NODE_VAL}" = "0" ]; then
+			FB_ACTUAL_WIDTH="${FB_HEIGHT}"
+			FB_ACTUAL_HEIGHT="${FB_WIDTH}"
+		fi
 	fi
 
-	/opt/muos/frontend/mufbset -w "$WIDTH" -h "$HEIGHT" -d "$DEPTH"
+	/opt/muos/frontend/mufbset -w "${FB_ACTUAL_WIDTH}" -h "${FB_ACTUAL_HEIGHT}" -d "${FB_DEPTH}"
 }
 
 HDMI_SWITCH() {
-	WIDTH=0
-	HEIGHT=0
-	DEPTH=32
+	HS_RES="$(GET_VAR "config" "settings/hdmi/resolution")"
+	HD_DEP=32
 
-	case "$(GET_VAR "config" "settings/hdmi/resolution")" in
-		0 | 2)
-			WIDTH=640
-			HEIGHT=480
-			;;
-		1 | 3)
-			WIDTH=720
-			HEIGHT=576
-			;;
+	case "${HS_RES}" in
+		0 | 1)
+			HS_WIDTH=720
+			HS_HEIGHT=480
+			;; # 480i / 576i  (720-stride interlaced)
+		2)
+			HS_WIDTH=720
+			HS_HEIGHT=480
+			;; # 480p
+		3)
+			HS_WIDTH=720
+			HS_HEIGHT=576
+			;; # 576p
 		4 | 5)
-			WIDTH=1280
-			HEIGHT=720
-			;;
-		6 | 7 | 8 | 9 | 10)
-			WIDTH=1920
-			HEIGHT=1080
-			;;
+			HS_WIDTH=1280
+			HS_HEIGHT=720
+			;; # 720p (50 or 60 Hz)
+		6 | 7)
+			HS_WIDTH=1920
+			HS_HEIGHT=1080
+			;; # 1080i (50 or 60 Hz)
+		8 | 9 | 10)
+			HS_WIDTH=1920
+			HS_HEIGHT=1080
+			;; # 1080p (24, 50, or 60 Hz)
 		*)
-			WIDTH="$(GET_VAR "device" "screen/internal/width")"
-			HEIGHT="$(GET_VAR "device" "screen/internal/height")"
+			# Unknown index — fall back to internal panel size
+			HS_WIDTH="$(GET_VAR "device" "screen/internal/width")"
+			HS_HEIGHT="$(GET_VAR "device" "screen/internal/height")"
 			;;
 	esac
 
-	SET_VAR "device" "screen/external/width" "$WIDTH"
-	SET_VAR "device" "screen/external/height" "$HEIGHT"
+	SET_VAR "device" "screen/external/width" "${HS_WIDTH}"
+	SET_VAR "device" "screen/external/height" "${HS_HEIGHT}"
 
-	FB_SWITCH "$WIDTH" "$HEIGHT" "$DEPTH"
+	FB_SWITCH "${HS_WIDTH}" "${HS_HEIGHT}" "${HD_DEP}"
 }
 
 # Normal mode is stating that the factory reset routine is complete
@@ -592,32 +609,49 @@ IS_HANDHELD_MODE() {
 }
 
 # Writes a setting value to the display driver.
+# Typically used for brightness on most devices but has
+# HDMI mode support for those who use it, unfortunately
 # Usage: DISPLAY_WRITE NAME COMMAND PARAM
 DISPLAY_WRITE() {
+	DW_NAME="${1}"
+	DW_CMD="${2}"
+	DW_PARAM="${3}"
+
 	case "$(GET_VAR "device" "board/name")" in
 		rg* | mgx* | tui*)
-			printf "%s" "$1" >/sys/kernel/debug/dispdbg/name
-			printf "%s" "$2" >/sys/kernel/debug/dispdbg/command
-			printf "%s" "$3" >/sys/kernel/debug/dispdbg/param
-			echo 1 >/sys/kernel/debug/dispdbg/start &
+			printf "%s" "${DW_NAME}" >/sys/kernel/debug/dispdbg/name
+			printf "%s" "${DW_CMD}" >/sys/kernel/debug/dispdbg/command
+			printf "%s" "${DW_PARAM}" >/sys/kernel/debug/dispdbg/param
+			printf "1\n" >/sys/kernel/debug/dispdbg/start
 			;;
-		rk-g350*) printf "%s" "$3" >/sys/class/backlight/backlight/brightness ;;
+		rk-g350*)
+			printf "%s" "${DW_PARAM}" >/sys/class/backlight/backlight/brightness
+			;;
 		*) ;;
+
 	esac
 }
 
 # Reads and prints a setting value from the display driver.
+# Just like the above function it is mainly for brightness
+# but can also be used for HDMI functionality...
 # Usage: DISPLAY_READ NAME COMMAND
 DISPLAY_READ() {
+	DR_NAME="${1}"
+	DR_CMD="${2}"
+
 	case "$(GET_VAR "device" "board/name")" in
 		rg* | mgx* | tui*)
-			printf "%s" "$1" >/sys/kernel/debug/dispdbg/name
-			printf "%s" "$2" >/sys/kernel/debug/dispdbg/command
-			echo 1 >/sys/kernel/debug/dispdbg/start
+			printf "%s" "${DR_NAME}" >/sys/kernel/debug/dispdbg/name
+			printf "%s" "${DR_CMD}" >/sys/kernel/debug/dispdbg/command
+			printf "1\n" >/sys/kernel/debug/dispdbg/start
 			cat /sys/kernel/debug/dispdbg/info
 			;;
-		rk-g350*) cat /sys/class/backlight/backlight/brightness ;;
+		rk-g350*)
+			cat /sys/class/backlight/backlight/brightness
+			;;
 		*) ;;
+
 	esac
 }
 
