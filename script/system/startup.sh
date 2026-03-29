@@ -179,6 +179,22 @@ LOG_INFO "$0" 0 "BOOTING" "Checking for Safety Script"
 OOPS="$ROM_MOUNT/oops.sh"
 [ -x "$OOPS" ] && "$OOPS" && rm -f "$OOPS"
 
+#:] ### Precaching Content Mounts
+#:] Allows for quick content item resolve
+LOG_INFO "$0" 0 "BOOTING" "Precaching Content Mounts"
+(
+	SD1_MOUNT="$(GET_VAR "device" "storage/rom/mount")"
+	SD2_MOUNT="$(GET_VAR "device" "storage/sdcard/mount")"
+	USB_MOUNT="$(GET_VAR "device" "storage/usb/mount")"
+
+	for STORAGE_MOUNT in $SD1_MOUNT $SD2_MOUNT $USB_MOUNT; do
+		[ -d "$STORAGE_MOUNT/ROMS" ] || continue
+
+		find "$STORAGE_MOUNT/ROMS" -maxdepth 2 -type d >/dev/null
+		nice -n 19 ionice -c3 find "$STORAGE_MOUNT/ROMS" -maxdepth 4 >/dev/null
+	done
+) &
+
 #:] ### Storage Authenticity Check
 #:] Quickly check the storage devices for authenticity
 LOG_INFO "$0" 0 "BOOTING" "Storage Authenticity Check"
