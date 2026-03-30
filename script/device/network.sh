@@ -9,6 +9,7 @@ SCN_PATH="/sys/class/net"
 RESOLV_CONF="/etc/resolv.conf"
 
 HAS_NETWORK=$(GET_VAR "device" "board/network")
+NET_MODULE=$(GET_VAR "device" "network/module")
 NET_IFACE=$(GET_VAR "device" "network/iface")
 NET_NAME=$(GET_VAR "device" "network/name")
 DNS_ADDR=$(GET_VAR "config" "network/dns")
@@ -97,7 +98,7 @@ LOAD_NETWORK() {
 		mgx* | tui*)
 			# Can't "force" the module to load on TrimUI devices because otherwise it gets cranky
 			if ! grep -qw "^$NET_NAME" /proc/modules; then
-				modprobe -q "$NET_NAME"
+				insmod "$NET_MODULE"
 			fi
 			;;
 		rk*)
@@ -166,24 +167,6 @@ UNLOAD_NETWORK() {
 		modprobe -qr "$NET_NAME"
 		sleep 2
 	fi
-
-	case "$BOARD_NAME" in
-		mgx* | tui*)
-			# Remove the stupid leftover xradio modules
-			if grep -qw "^xradio_mac" /proc/modules; then
-				modprobe -qr "xradio_mac"
-				sleep 1
-			fi
-			if grep -qw "^xradio_core" /proc/modules; then
-				modprobe -qr "xradio_core"
-				sleep 1
-			fi
-			if grep -qw "^xradio_wlan" /proc/modules; then
-				modprobe -qr "xradio_wlan"
-				sleep 1
-			fi
-			;;
-	esac
 
 	[ -f "$RESOLV_CONF.bak" ] && mv -f "$RESOLV_CONF.bak" "$RESOLV_CONF"
 
