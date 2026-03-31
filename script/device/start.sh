@@ -48,6 +48,9 @@ BOARD_NAME=$(GET_VAR "device" "board/name")
 EMU_VER=
 
 case "$BOARD_NAME" in
+	rg-vita*)
+		EMU_VER="vita"
+		;;
 	rg*)
 		EMU_VER="rg"
 		case "$BOARD_NAME" in
