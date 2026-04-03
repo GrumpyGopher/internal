@@ -447,7 +447,7 @@ case "$1" in
 				/opt/muos/script/web/service.sh &
 
 				LOG_INFO "$0" 0 "NETWORK" "Restarting Chrony Service"
-				/opt/muos/script/init/S00chrony restart
+				/opt/muos/script/init/S00chrony restart &
 
 				LOG_INFO "$0" 0 "NETWORK" "Running Chrony Time Sync"
 				chronyc burst 4/4
