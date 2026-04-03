@@ -2,7 +2,7 @@ state.audiocodec {
 	control.1 {
 		iface MIXER
 		name 'tx hub mode'
-		value Off
+		value On
 		comment {
 			access 'read write'
 			type ENUMERATED
