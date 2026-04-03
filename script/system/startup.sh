@@ -125,6 +125,16 @@ if [ "$FACTORY_RESET" -eq 1 ]; then
 	exit 0
 fi
 
+#:] ### Device Specific Startup
+#:] Board/variant hooks to finalise hardware setup.
+LOG_INFO "$0" 0 "BOOTING" "Device Specific Startup"
+/opt/muos/script/device/start.sh &
+
+#:] ### Storage Mounting
+#:] Ensure all mounts are set and that UnionFS is running.
+LOG_INFO "$0" 0 "BOOTING" "Loading Storage Mounts"
+/opt/muos/script/mount/start.sh &
+
 #:] ### Permissions sanity pass (background)
 #:] Ensure ownership and perms are sane on key trees.
 #:] Typically for SSH. This is needed specifically for the H700
@@ -138,16 +148,6 @@ chmod -R 755 "/root" "/opt/openssh" "/opt/sftpgo" &
 #:] Bring up `lo` so local services can bind immediately.
 LOG_INFO "$0" 0 "BOOTING" "Bringing Up 'localhost' Network"
 ifconfig lo up &
-
-#:] ### Device Specific Startup
-#:] Board/variant hooks to finalise hardware setup.
-LOG_INFO "$0" 0 "BOOTING" "Device Specific Startup"
-/opt/muos/script/device/start.sh &
-
-#:] ### Storage Mounting
-#:] Ensure all mounts are set and that UnionFS is running.
-LOG_INFO "$0" 0 "BOOTING" "Loading Storage Mounts"
-/opt/muos/script/mount/start.sh &
 
 #:] ### Restore Internal Display Geometry
 #:] Ensure both the internal screen and the mux frontend have the proper resolution.
