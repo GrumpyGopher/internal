@@ -8,39 +8,15 @@
 
 . /opt/muos/script/var/func.sh
 
-#:] ### Session Housekeeping
-#:] Create a temp workspace and clear any stale logs and update data from previous boots.
-mkdir -p "/tmp/muos"
-rm -rf "$MUOS_LOG_DIR"/*.log "/opt/muxtmp"
-
-#:] ### Initialise Core State
-#:] Cache uptime and baseline flags used by other components during boot.
-read -r MU_UPTIME _ </proc/uptime
-SET_VAR "system" "resume_uptime" "$MU_UPTIME"
-SET_VAR "system" "idle_inhibit" "0"
-SET_VAR "config" "boot/device_mode" "0"
-SET_VAR "device" "audio/ready" "0"
+#:] ### Enable Rumble Support
+#:] Primarily used for TrimUI/RK3326 devices at the moment.
+LOG_INFO "$0" 0 "BOOTING" "Enabling Device Rumble"
+/opt/muos/script/device/rumble.sh &
 
 #:] ### Battery Watchdog
 #:] Start the battery watchdog that helps with voltage calibration.
 LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
 BATTERY start
-
-#:] ### Start PipeWire Audio
-#:] Launch PipeWire and WirePlumber in one go.
-LOG_INFO "$0" 0 "BOOTING" "Starting Pipewire"
-/opt/muos/script/system/pipewire.sh start &
-
-#:] ### Set OS Release Metadata
-#:] Generate `/etc/os-release` and similar so services can report the right version.
-LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
-/opt/muos/script/system/os_release.sh &
-
-#:] ### Reset Display variables
-#:] Just in case somebody, or something, has rotated the display.
-LOG_INFO "$0" 0 "BOOTING" "Reset temporary screen rotation and zoom"
-SCREEN_DIR="/opt/muos/device/config/screen"
-rm -f "$SCREEN_DIR/s_rotate" "$SCREEN_DIR/s_zoom" &
 
 #:] ### Frequently Used Variables
 #:] These are best to call once and use repeatedly instead of calling them individually.
@@ -62,10 +38,48 @@ RA_CACHE=$(GET_VAR "config" "settings/advanced/retrocache")
 HDMI_PATH=$(GET_VAR "device" "screen/hdmi")
 NET_ASYNC=$(GET_VAR "config" "settings/network/async_load")
 
-#:] ### Enable Rumble Support
-#:] Primarily used for TrimUI/RK3326 devices at the moment.
-LOG_INFO "$0" 0 "BOOTING" "Enabling Device Rumble"
-/opt/muos/script/device/rumble.sh &
+#:] ### Session Housekeeping
+#:] Create a temp workspace and clear any stale logs and update data from previous boots.
+mkdir -p "/tmp/muos"
+rm -rf "$MUOS_LOG_DIR"/*.log "/opt/muxtmp"
+
+#:] ### Initialise Core State
+#:] Cache uptime and baseline flags used by other components during boot.
+read -r MU_UPTIME _ </proc/uptime
+SET_VAR "system" "resume_uptime" "$MU_UPTIME"
+SET_VAR "system" "idle_inhibit" "0"
+SET_VAR "config" "boot/device_mode" "0"
+SET_VAR "device" "audio/ready" "0"
+
+LOG_INFO "$0" 0 "BOOTING" "Detecting Console Mode"
+CONSOLE_MODE=0
+if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
+	HDMI_VALUE=0
+
+	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && HDMI_VALUE=$(cat "$HDMI_PATH")
+
+	case "$HDMI_VALUE" in
+		1) CONSOLE_MODE=1 ;; # HDMI is active = external
+		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;; # Non-numeric, 0, or fallback = internal
+	esac
+fi
+SET_VAR "config" "boot/device_mode" "$CONSOLE_MODE"
+
+#:] ### Start PipeWire Audio
+#:] Launch PipeWire and WirePlumber in one go.
+LOG_INFO "$0" 0 "BOOTING" "Starting Pipewire"
+/opt/muos/script/system/pipewire.sh start &
+
+#:] ### Set OS Release Metadata
+#:] Generate `/etc/os-release` and similar so services can report the right version.
+LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
+/opt/muos/script/system/os_release.sh &
+
+#:] ### Reset Display variables
+#:] Just in case somebody, or something, has rotated the display.
+LOG_INFO "$0" 0 "BOOTING" "Reset temporary screen rotation and zoom"
+SCREEN_DIR="/opt/muos/device/config/screen"
+rm -f "$SCREEN_DIR/s_rotate" "$SCREEN_DIR/s_zoom" &
 
 #:] ### Set Default CPU Governor
 #:] Run the CPU at full performance during boot to shorten startup time.
@@ -84,7 +98,9 @@ fi
 #:] On the very first boot, show a disclaimer.
 #:] Once that is done and we've rebooted display a "Getting Ready" message for slower device combinations.
 if [ "$FIRST_INIT" -eq 0 ]; then
-	/opt/muos/script/device/module.sh load
+	/opt/muos/script/device/module.sh load &
+	MODULE_PID=$!
+
 	if [ "$FACTORY_RESET" -eq 1 ]; then
 		LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
 		/opt/muos/frontend/muxwarn &
@@ -151,22 +167,15 @@ rm -rf "/opt/update.sh"
 echo 1 >"$MUOS_RUN_DIR/work_led_state"
 : >"$MUOS_RUN_DIR/net_start"
 
-LOG_INFO "$0" 0 "BOOTING" "Detecting Console Mode"
-CONSOLE_MODE=0
-if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
-	HDMI_VALUE=0
-
-	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && HDMI_VALUE=$(cat "$HDMI_PATH")
-
-	case "$HDMI_VALUE" in
-		1) CONSOLE_MODE=1 ;; # HDMI is active = external
-		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;; # Non-numeric, 0, or fallback = internal
-	esac
-fi
-SET_VAR "config" "boot/device_mode" "$CONSOLE_MODE"
-
 LOG_INFO "$0" 0 "BOOTING" "Checking Swap Requirements"
 /opt/muos/script/system/swap.sh &
+
+#:] ### Device Module Wait
+#:] Block until device modules are loaded and complete
+if [ "$FIRST_INIT" -eq 0 ] && [ -n "${MODULE_PID:-}" ]; then
+	LOG_INFO "$0" 0 "BOOTING" "Waiting for Module Load"
+	wait "$MODULE_PID"
+fi
 
 #:] ### Storage Mount Wait
 #:] Block until union mounts are ready so later steps can rely on them.

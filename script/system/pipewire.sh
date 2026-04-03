@@ -194,11 +194,11 @@ FINALISE_AUDIO() {
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to set default node '%s'" "$DEF_ID")"
 	fi
 
-	sleep 0.1
-	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
-
 	APPLY_VOL=${RUNTIME_PERCENT:-$SAVED_VOL}
 	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${APPLY_VOL}%" >/dev/null 2>&1
+
+	sleep 0.1
+	wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null 2>&1
 
 	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 
@@ -209,38 +209,35 @@ FINALISE_AUDIO() {
 DO_START() {
 	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
 
-	if ! START_PIPEWIRE; then
-		LOG_ERROR "$0" 0 "PIPEWIRE" "Failed to start"
-		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
-		exit 1
-	fi
-
 	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Default Sound System"
 	RESTORE_CONF "$MUOS_SHARE_DIR/conf/asound.conf" "/etc/asound.conf"
 
 	LOG_INFO "$0" 0 "PIPEWIRE" "ALSA Config Restoring"
 	RESTORE_CONF "$MUOS_SHARE_DIR/conf/alsa.conf" "/usr/share/alsa/alsa.conf"
 
-	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Audio State"
-	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore >/dev/null 2>&1
+	if ! START_PIPEWIRE; then
+		LOG_ERROR "$0" 0 "PIPEWIRE" "Failed to start"
+		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
+		exit 1
+	fi
 
-	RESET_MIXER
-
-	if WAIT_FOR_DBUS; then
-		LOG_SUCCESS "$0" 0 "PIPEWIRE" "D-Bus socket is available"
-	else
+	if ! WAIT_FOR_DBUS; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "D-Bus not ready after timeout; proceeding"
 	fi
 
-	if WAIT_FOR_PIPEWIRE_SOCKET; then
-		LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket is available (%s)" "$PW_SOCKET")"
-	else
+	if ! WAIT_FOR_PIPEWIRE_SOCKET; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket '%s' not ready after timeout" "$PW_SOCKET")"
 		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		exit 1
 	fi
 
+	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket is available (%s)" "$PW_SOCKET")"
 	wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 >/dev/null 2>&1
+
+	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Audio State"
+	alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" restore >/dev/null 2>&1
+
+	RESET_MIXER
 
 	if ! FINALISE_AUDIO; then
 		exit 1
@@ -253,7 +250,9 @@ DO_STOP() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Audio shutdown sequence..."
 
 	if SOCKET_READY; then
-		wpctl set-volume @DEFAULT_AUDIO_SINK@ 1% >/dev/null 2>&1
+		wpctl set-mute @DEFAULT_AUDIO_SINK@ 1 >/dev/null 2>&1
+		sleep 0.1
+		alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" store >/dev/null 2>&1
 	fi
 
 	if PROC_RUNNING wireplumber; then
