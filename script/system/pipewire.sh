@@ -139,8 +139,20 @@ GET_BOOT_SAVED_VOLUME() {
 	esac
 }
 
+INSTALL_WIREPLUMBER_CONF() {
+	WP_MINOR=$(wireplumber --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d. -f2)
+
+	if [ "${WP_MINOR:-0}" -ge 5 ]; then
+		# WirePlumber 5 (vita pro)
+		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.conf" "/usr/share/wireplumber/wireplumber.conf.d/60-muos-wireplumber.conf"
+	else
+		# WirePlumber 4
+		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" "/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
+	fi
+}
+
 START_PIPEWIRE() {
-	RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" "/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
+	INSTALL_WIREPLUMBER_CONF
 
 	if SOCKET_READY; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire already running and socket is ready"
@@ -163,6 +175,7 @@ START_PIPEWIRE() {
 		LOG_INFO "$0" 0 "PIPEWIRE" "Starting WirePlumber..."
 		PIPEWIRE_RUNTIME_DIR="$PIPEWIRE_RUNTIME_DIR" \
 			XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+			DBUS_SESSION_BUS_ADDRESS="unix:path=/run/dbus/system_bus_socket" \
 			wireplumber >/dev/null 2>&1 &
 	fi
 
