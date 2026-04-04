@@ -63,26 +63,14 @@ case "$1" in
 		CUR=$(GET_CURRENT)
 		[ -n "$CUR" ] || CUR=0
 
-		if [ "$MAX" -le "$MIN" ]; then
-			NEW_VL=$MIN
-		else
-			CUR_VAL=$((MIN + (CUR * (MAX - MIN) / 100)))
-			NEW_VL=$((CUR_VAL + INC))
-		fi
-
+		NEW_VL=$((CUR + INC))
 		SET_CURRENT "$NEW_VL"
 		;;
 	D)
 		CUR=$(GET_CURRENT)
 		[ -n "$CUR" ] || CUR=0
 
-		if [ "$MAX" -le "$MIN" ]; then
-			NEW_VL=$MIN
-		else
-			CUR_VAL=$((MIN + (CUR * (MAX - MIN) / 100)))
-			NEW_VL=$((CUR_VAL - INC))
-		fi
-
+		NEW_VL=$((CUR - INC))
 		SET_CURRENT "$NEW_VL"
 		;;
 	I) VOL_INFO ;;
