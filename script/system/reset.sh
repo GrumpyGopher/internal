@@ -13,14 +13,24 @@ NET_IFACE="$(GET_VAR "device" "network/iface")"
 
 ROM_PART="/dev/${ROM_DEV}${ROM_SEP}${ROM_NUM}"
 
+case "$ROM_TYPE" in
+	exfat) ROM_MOUNT_OPTS="rw,noatime,nofail" ;;
+	vfat) ROM_MOUNT_OPTS="rw,utf8,noatime,nofail" ;;
+	*) ROM_MOUNT_OPTS="rw,noatime,nofail" ;;
+esac
+
 LOG_INFO "$0" 0 "FACTORY RESET" "Expanding ROM Partition"
 printf "w\nw\n" | fdisk /dev/"$ROM_DEV"
 parted ---pretend-input-tty /dev/"$ROM_DEV" resizepart "$ROM_NUM" 100%
 
+mkdir -p "$ROM_MOUNT"
+
 LOG_INFO "$0" 0 "FACTORY RESET" "Formatting ROM Partition"
-mkfs."$ROM_TYPE" "$ROM_PART"
 case "$ROM_TYPE" in
-	vfat | exfat) exfatlabel "$ROM_PART" ROMS ;;
+	exfat) mkfs.exfat -n ROMS "$ROM_PART" ;;
+	vfat) mkfs.vfat -F 32 -n ROMS "$ROM_PART" ;;
+	ext4) mkfs."$ROM_TYPE" -F -L ROMS "$ROM_PART" ;;
+	*) mkfs."$ROM_TYPE" "$ROM_PART" ;;
 esac
 
 LOG_INFO "$0" 0 "FACTORY RESET" "Setting ROM Partition Flags"
@@ -29,7 +39,7 @@ parted ---pretend-input-tty /dev/"$ROM_DEV" set "$ROM_NUM" hidden off
 parted ---pretend-input-tty /dev/"$ROM_DEV" set "$ROM_NUM" msftdata on
 
 LOG_INFO "$0" 0 "FACTORY RESET" "Mounting ROM Partition"
-if mount -t "$ROM_TYPE" -o rw,utf8,noatime,nofail "$ROM_PART" "$ROM_MOUNT"; then
+if mount -t "$ROM_TYPE" -o "$ROM_MOUNT_OPTS" "$ROM_PART" "$ROM_MOUNT"; then
 	SET_VAR "device" "storage/rom/active" "1"
 else
 	killall -q "mpv"
@@ -115,6 +125,7 @@ RT_DIR="/mnt/mmc/MUOS/PortMaster/runtimes"
 RT_ZIP="$MUOS_SHARE_DIR/archive/runtimes.popular.aarch64.zip"
 if [ -e "$RT_ZIP" ]; then
 	LOG_INFO "$0" 0 "FACTORY RESET" "Decompressing PortMaster Runtimes"
+	mkdir -p "$RT_DIR"
 	unzip -oq "$RT_ZIP" -d "$RT_DIR"
 fi
 

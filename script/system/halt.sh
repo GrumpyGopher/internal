@@ -200,10 +200,6 @@ fi
 LOG_INFO "$0" 0 "HALT" "Stopping Pipewire"
 /opt/muos/script/system/pipewire.sh stop
 
-# Cleanly unmount filesystems to avoid fsck/chkdsk errors.
-LOG_INFO "$0" 0 "HALT" "Stopping union mounts"
-/opt/muos/script/mount/union.sh stop
-
 # Unmount SD2 and USB - we do USB first as it is the higher priority!
 LOG_INFO "$0" 0 "HALT" "Stopping external storage mounts"
 /opt/muos/script/mount/storage.sh "usb" "down"

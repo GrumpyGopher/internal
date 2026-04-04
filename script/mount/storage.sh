@@ -42,17 +42,15 @@ MOUNTED() {
 	grep -qs " $MOUNT_POINT " /proc/mounts
 }
 
-HAS_DEVICE() {
-	grep -qw "$DEVICE" /proc/partitions
-}
-
 MOUNT_DEVICE() {
 	FS_INFO="$(blkid -o export "/dev/$DEVICE" 2>/dev/null)"
 	FS_TYPE="$(printf '%s\n' "$FS_INFO" | awk -F= '/^TYPE=/{print $2}')"
 	FS_LABEL="$(printf '%s\n' "$FS_INFO" | awk -F= '/^LABEL=/{print $2}')"
 
 	case "$FS_TYPE" in
-		vfat | exfat) FS_OPTS="rw,utf8,noatime,nofail" ;;
+		exfat) FS_OPTS="rw,noatime,nofail" ;;
+		vfat) FS_OPTS="rw,utf8,noatime,nofail" ;;
+		ext4) FS_OPTS="rw,noatime,nofail" ;;
 		*) return 1 ;;
 	esac
 
@@ -113,26 +111,22 @@ DO_MOUNT() {
 		exit 0
 	fi
 
-	if ! HAS_DEVICE; then
-		printf "%s device not present: /dev/%s\n" "$TYPE" "$DEVICE" >&2
-		exit 1
-	fi
-
-	# Stop union only if we aren't running this on boot...
-	[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/union.sh stop
-
 	if MOUNT_DEVICE; then
-		[ "$DURING_BOOT" -eq 0 ] && {
-			/opt/muos/script/mount/bind.sh
-			/opt/muos/script/mount/union.sh start
-		}
+		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/bind.sh
 		printf "%s mounted: /dev/%s -> %s\n" "$TYPE" "$DEVICE" "$MOUNT_POINT"
 		exit 0
 	fi
 
-	printf "%s mount failed: /dev/%s\n" "$TYPE" "$DEVICE" >&2
+	# At this point we don not know if it failed due to...
+	# Missing device / Unsupported filesystem / General mount error
+	if [ ! -b "/dev/$DEVICE" ]; then
+		printf "%s device not present: /dev/%s\n" "$TYPE" "$DEVICE" >&2
+	else
+		printf "%s mount failed: /dev/%s\n" "$TYPE" "$DEVICE" >&2
+	fi
+
 	SET_VAR "device" "storage/$TYPE/active" "0"
-	[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/union.sh start
+
 	exit 1
 }
 
@@ -143,18 +137,12 @@ DO_EJECT() {
 		exit 0
 	fi
 
-	[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/union.sh stop
-
 	if UNMOUNT_DEVICE; then
-		[ "$DURING_BOOT" -eq 0 ] && {
-			/opt/muos/script/mount/bind.sh
-			/opt/muos/script/mount/union.sh start
-		}
+		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/bind.sh
 		printf "%s ejected: %s\n" "$TYPE" "$MOUNT_POINT"
 		exit 0
 	fi
 
-	[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/union.sh start
 	printf "%s eject failed: %s\n" "$TYPE" "$MOUNT_POINT" >&2
 	exit 1
 }
