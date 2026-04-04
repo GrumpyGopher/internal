@@ -186,15 +186,29 @@ RESTORE_AUDIO_VOLUME() {
 SET_DEFAULT_GOVERNOR() {
 	(
 		DEF_GOV=$(GET_VAR "device" "cpu/default")
-		printf "%s" "$DEF_GOV" >"$(GET_VAR "device" "cpu/governor")"
+		GOV_PATH="$(GET_VAR "device" "cpu/governor")"
+		printf "%s" "$DEF_GOV" >"$GOV_PATH"
 
-		if [ "$DEF_GOV" = ondemand ]; then
-			GET_VAR "device" "cpu/min_freq_default" >"$(GET_VAR "device" "cpu/min_freq")"
-			GET_VAR "device" "cpu/max_freq_default" >"$(GET_VAR "device" "cpu/max_freq")"
-			GET_VAR "device" "cpu/sampling_rate_default" >"$(GET_VAR "device" "cpu/sampling_rate")"
-			GET_VAR "device" "cpu/up_threshold_default" >"$(GET_VAR "device" "cpu/up_threshold")"
-			GET_VAR "device" "cpu/sampling_down_factor_default" >"$(GET_VAR "device" "cpu/sampling_down_factor")"
-			GET_VAR "device" "cpu/io_is_busy_default" >"$(GET_VAR "device" "cpu/io_is_busy")"
+		if [ "$DEF_GOV" = "ondemand" ]; then
+			CPU_PATH=$(dirname "$GOV_PATH")
+
+			# Detect differing kernel version layout
+			if [ -d "$CPU_PATH/ondemand" ]; then
+				OD_PATH="$CPU_PATH/ondemand"
+			else
+				OD_PATH="$CPU_PATH"
+			fi
+
+			MIN_PATH="$(GET_VAR "device" "cpu/min_freq")"
+			MAX_PATH="$(GET_VAR "device" "cpu/max_freq")"
+
+			[ -f "$MIN_PATH" ] && GET_VAR "device" "cpu/min_freq_default" >"$MIN_PATH"
+			[ -f "$MAX_PATH" ] && GET_VAR "device" "cpu/max_freq_default" >"$MAX_PATH"
+
+			[ -f "$OD_PATH/sampling_rate" ] && GET_VAR "device" "cpu/sampling_rate_default" >"$OD_PATH/sampling_rate"
+			[ -f "$OD_PATH/up_threshold" ] && GET_VAR "device" "cpu/up_threshold_default" >"$OD_PATH/up_threshold"
+			[ -f "$OD_PATH/sampling_down_factor" ] && GET_VAR "device" "cpu/sampling_down_factor_default" >"$OD_PATH/sampling_down_factor"
+			[ -f "$OD_PATH/io_is_busy" ] && GET_VAR "device" "cpu/io_is_busy_default" >"$OD_PATH/io_is_busy"
 		fi
 	) &
 }
