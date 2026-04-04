@@ -5,7 +5,7 @@
 
 TYPE="${1:-}"
 ACTION="${2:-}"
-DURING_BOOT="${3:-0}" # 1 = do not trigger bind/union logic if we're booting
+DURING_BOOT="${3:-0}" # 1 = do not trigger bind logic if we are booting
 
 [ -z "$TYPE" ] && {
 	printf "Missing storage type ( rom | sdcard | usb | ...? )\n" >&2

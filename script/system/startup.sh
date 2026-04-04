@@ -178,7 +178,7 @@ if [ "$FIRST_INIT" -eq 0 ] && [ -n "${MODULE_PID:-}" ]; then
 fi
 
 #:] ### Storage Mount Wait
-#:] Block until union mounts are ready so later steps can rely on them.
+#:] Block until all mounts are ready so later steps can rely on them.
 LOG_INFO "$0" 0 "BOOTING" "Waiting for Storage Mounts"
 until [ -f "$MUOS_STORE_DIR/mount_ready" ]; do sleep 0.01; done
 
