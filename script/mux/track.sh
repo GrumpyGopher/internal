@@ -31,6 +31,50 @@ fi
 # For debugging - output values to a log file
 # printf '%s\n' "$(date): $NAME $CORE $FILE $ACTION" >> "/mnt/mmc/MUOS/info/track/playtime_debug.log"
 
+MIGRATE_JSON() {
+	if ! command -v jq >/dev/null 2>&1; then
+		return
+	fi
+
+	# fast skip
+	if ! grep -q '"/mnt/union/' "$TRACK_JSON"; then
+		return
+	fi
+
+	TMP="${TRACK_JSON}.migrate"
+
+	jq -r 'keys[]' "$TRACK_JSON" | while IFS= read -r key; do
+		case "$key" in
+			/mnt/union/*)
+				REL="${key#/mnt/union/}"
+
+				FOUND=""
+				for m in /mnt/usb /mnt/sdcard /mnt/mmc; do
+					CAND="$m/$REL"
+					if [ -f "$CAND" ] || [ -d "$CAND" ]; then
+						FOUND="$CAND"
+						break
+					fi
+				done
+
+				if [ -n "$FOUND" ]; then
+					# check if destination already exists
+					if jq -e --arg new "$FOUND" '.[$new]' "$TRACK_JSON" >/dev/null 2>&1; then
+						# destination exists then purge old
+						jq --arg old "$key" 'del(.[$old])' "$TRACK_JSON" >"$TMP" && mv "$TMP" "$TRACK_JSON"
+					else
+						# safe to migrate
+						jq --arg old "$key" --arg new "$FOUND" '.[$new] = .[$old] | del(.[$old])' "$TRACK_JSON" >"$TMP" && mv "$TMP" "$TRACK_JSON"
+					fi
+				else
+					# no valid path? purge away
+					jq --arg old "$key" 'del(.[$old])' "$TRACK_JSON" >"$TMP" && mv "$TMP" "$TRACK_JSON"
+				fi
+				;;
+		esac
+	done
+}
+
 UPDATE_JSON() {
 	if ! command -v jq >/dev/null 2>&1; then
 		printf "Error: jq is required for JSON processing.\n" >&2
@@ -143,6 +187,7 @@ UPDATE_JSON() {
 
 case "$ACTION" in
 	start | stop | resume)
+		MIGRATE_JSON
 		UPDATE_JSON
 		;;
 	*)
