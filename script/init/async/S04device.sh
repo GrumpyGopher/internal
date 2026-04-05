@@ -2,39 +2,74 @@
 
 . /opt/muos/script/var/func.sh
 
+[ "$FACTORY_RESET" -eq 1 ] && exit 0
+
+HDMI_PATH=$(GET_VAR "device" "screen/hdmi")
+BOARD_HDMI=$(GET_VAR "device" "board/hdmi")
+
 sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
 
 if [ "$(GET_VAR "device" "board/debugfs")" -eq 1 ]; then
 	mount -t debugfs debugfs /sys/kernel/debug
 fi
 
-if [ "$(GET_VAR "config" "boot/device_mode")" -eq 1 ]; then
-	/opt/muos/script/device/hdmi.sh
+if [ "$FIRST_INIT" -eq 1 ]; then
+	if [ "$FACTORY_RESET" -eq 0 ]; then
+		/opt/muos/script/device/module.sh load &
+	fi
 else
-	/opt/muos/script/device/bright.sh R
+	/opt/muos/script/device/module.sh load &
 
-	case "$(GET_VAR "config" "settings/advanced/brightness")" in
-		3) /opt/muos/script/device/bright.sh "$(GET_VAR "device" "screen/bright")" ;;
-		2) /opt/muos/script/device/bright.sh 90 ;;
-		1) /opt/muos/script/device/bright.sh 35 ;;
-		*) /opt/muos/script/device/bright.sh "$(GET_VAR "config" "settings/general/brightness")" ;;
+	if [ "$FACTORY_RESET" -eq 1 ]; then
+		LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
+		/opt/muos/frontend/muxwarn &
+	fi
+fi
+
+if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
+	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && HDMI_VALUE=$(cat "$HDMI_PATH")
+
+	case "$HDMI_VALUE" in
+		1) CONSOLE_MODE=1 ;; # HDMI is active = external
+		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;; # Non-numeric, 0, or fallback = internal
 	esac
 
-	GET_VAR "config" "settings/colour/temperature" >"$(GET_VAR "device" "screen/colour")"
-	SET_VAR "config" "settings/hdmi/scan" "0"
+	SET_VAR "config" "boot/device_mode" "$CONSOLE_MODE"
 fi
 
-if [ "$(GET_VAR "config" "settings/advanced/overdrive")" -eq 1 ]; then
-	SET_VAR "device" "audio/max" "200"
+if [ "$(GET_VAR "config" "boot/device_mode")" -eq 1 ]; then
+	/opt/muos/script/device/hdmi.sh &
 else
-	SET_VAR "device" "audio/max" "100"
+	(
+		/opt/muos/script/device/bright.sh R
+
+		case "$(GET_VAR "config" "settings/advanced/brightness")" in
+			3) /opt/muos/script/device/bright.sh "$(GET_VAR "device" "screen/bright")" ;;
+			2) /opt/muos/script/device/bright.sh 90 ;;
+			1) /opt/muos/script/device/bright.sh 35 ;;
+			*) /opt/muos/script/device/bright.sh "$(GET_VAR "config" "settings/general/brightness")" ;;
+		esac
+
+		GET_VAR "config" "settings/colour/temperature" >"$(GET_VAR "device" "screen/colour")"
+		SET_VAR "config" "settings/hdmi/scan" "0"
+	) &
 fi
 
-if [ "$(GET_VAR "config" "settings/advanced/thermal")" -eq 0 ]; then
-	for ZONE in /sys/class/thermal/thermal_zone*; do
-		[ -e "$ZONE/mode" ] && echo "disabled" >"$ZONE/mode"
-	done
-fi
+(
+	if [ "$(GET_VAR "config" "settings/advanced/overdrive")" -eq 1 ]; then
+		SET_VAR "device" "audio/max" "200"
+	else
+		SET_VAR "device" "audio/max" "100"
+	fi
+) &
+
+(
+	if [ "$(GET_VAR "config" "settings/advanced/thermal")" -eq 0 ]; then
+		for ZONE in /sys/class/thermal/thermal_zone*; do
+			[ -e "$ZONE/mode" ] && echo "disabled" >"$ZONE/mode"
+		done
+	fi
+) &
 
 rfkill unblock all 2>/dev/null
 
@@ -135,5 +170,3 @@ INSTALL_ARCHIVE "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.tar.gz" "${PPSSPP_DIR}/PPSSPP-$
 
 SCUMMVM_DIR="$MUOS_SHARE_DIR/emulator/scummvm"
 INSTALL_ARCHIVE "${SCUMMVM_DIR}/scummvm-${EMU_VER}.tar.gz" "${SCUMMVM_DIR}/scummvm-${EMU_VER}.md5" "$SCUMMVM_DIR" "scummvm-*" "${SCUMMVM_DIR}/scummvm" &
-
-wait

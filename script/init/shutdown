@@ -1,9 +1,14 @@
 #!/bin/sh
 # shellcheck source=/dev/null
 
-for S in $(printf '%s\n' "/opt/muos/script/init"/S??* | sort -r); do
-	[ -e "$S" ] || continue
-	[ -f "$S" ] || continue
+INIT_DIR="/opt/muos/script/init"
+ASYNC_DIR="$INIT_DIR/async"
+
+run_stop_script() {
+	S="$1"
+
+	[ -e "$S" ] || return 0
+	[ -f "$S" ] || return 0
 
 	case "$S" in
 		*.sh)
@@ -17,4 +22,23 @@ for S in $(printf '%s\n' "/opt/muos/script/init"/S??* | sort -r); do
 			"$S" stop
 			;;
 	esac
-done
+}
+
+reverse_run_dir() {
+	DIR="$1"
+
+	[ -d "$DIR" ] || return 0
+
+	for S in $(printf '%s\n' "$DIR"/S??* | sort -r); do
+		[ -e "$S" ] || continue
+		run_stop_script "$S"
+	done
+}
+
+# Stop async services first
+reverse_run_dir "$ASYNC_DIR"
+
+# Then stop normal init scripts
+reverse_run_dir "$INIT_DIR"
+
+exit 0

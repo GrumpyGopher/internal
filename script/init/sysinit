@@ -1,9 +1,14 @@
 #!/bin/sh
 # shellcheck source=/dev/null
 
-for S in "/opt/muos/script/init"/S??*; do
-	[ -e "$S" ] || continue
-	[ -f "$S" ] || continue
+INIT_DIR="/opt/muos/script/init"
+ASYNC_DIR="$INIT_DIR/async"
+
+run_script() {
+	S="$1"
+
+	[ -e "$S" ] || return 0
+	[ -f "$S" ] || return 0
 
 	case "$S" in
 		*.sh)
@@ -17,4 +22,22 @@ for S in "/opt/muos/script/init"/S??*; do
 			"$S" start
 			;;
 	esac
+}
+
+# Run async init scripts in order, but do not block boot
+if [ -d "$ASYNC_DIR" ]; then
+	for S in "$ASYNC_DIR"/S??*; do
+		[ -e "$S" ] || continue
+		(
+			run_script "$S"
+		) >/dev/null 2>&1 &
+	done
+fi
+
+# Run blocking init scripts in order
+for S in "$INIT_DIR"/S??*; do
+	[ -e "$S" ] || continue
+	run_script "$S"
 done
+
+exit 0

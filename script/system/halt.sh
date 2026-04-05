@@ -202,8 +202,8 @@ LOG_INFO "$0" 0 "HALT" "Stopping Pipewire"
 
 # Unmount SD2 and USB - we do USB first as it is the higher priority!
 LOG_INFO "$0" 0 "HALT" "Stopping external storage mounts"
-/opt/muos/script/mount/storage.sh "usb" "down"
-/opt/muos/script/mount/storage.sh "sdcard" "down"
+/opt/muos/script/device/storage.sh "usb" "down"
+/opt/muos/script/device/storage.sh "sdcard" "down"
 
 # Check if random theme is enabled and run the random theme script if necessary
 if [ "$(GET_VAR "config" "settings/advanced/random_theme")" -eq 1 ] 2>/dev/null; then

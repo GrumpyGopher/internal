@@ -37,15 +37,13 @@ echo "root" >"$EX_CARD"
 LOG_INFO "$0" 0 "FRONTEND" "Setting default CPU governor"
 SET_DEFAULT_GOVERNOR
 
-#:] ### Wait for audio stack
-#:] Don't proceed to the frontend until PipeWire reports that it is ready.
 if [ "$AUDIO_READY" -eq 1 ]; then
 	LOG_INFO "$0" 0 "BOOTING" "Waiting for Pipewire Init"
 	until [ "$(GET_VAR "device" "audio/ready")" -eq 1 ]; do sleep 0.1; done
-
-	LOG_INFO "$0" 0 "BOOTING" "Restoring Saved Volume"
-	RESTORE_AUDIO_VOLUME || LOG_WARN "$0" 0 "BOOTING" "Unable to restore saved volume"
 fi
+
+LOG_INFO  "$0" 0 "BOOTING" "Restoring Saved Volume"
+RESTORE_AUDIO_VOLUME  || LOG_WARN "$0" 0 "BOOTING" "Unable to restore saved volume"
 
 if [ "$SKIP" -eq 0 ]; then
 	LOG_INFO "$0" 0 "FRONTEND" "Checking for last or resume startup"

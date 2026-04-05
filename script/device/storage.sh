@@ -112,7 +112,7 @@ DO_MOUNT() {
 	fi
 
 	if MOUNT_DEVICE; then
-		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/bind.sh
+		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/device/bind.sh
 		printf "%s mounted: /dev/%s -> %s\n" "$TYPE" "$DEVICE" "$MOUNT_POINT"
 		exit 0
 	fi
@@ -138,7 +138,7 @@ DO_EJECT() {
 	fi
 
 	if UNMOUNT_DEVICE; then
-		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/mount/bind.sh
+		[ "$DURING_BOOT" -eq 0 ] && /opt/muos/script/device/bind.sh
 		printf "%s ejected: %s\n" "$TYPE" "$MOUNT_POINT"
 		exit 0
 	fi

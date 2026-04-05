@@ -95,6 +95,8 @@ MANAGE_WEBSERV() {
 			if ! PROC_EXISTS; then
 				case "$SRV" in
 					sshd)
+						chown -R root:root "/root" "/opt/openssh" "/opt/sftpgo"
+						chmod -R 755 "/root" "/opt/openssh" "/opt/sftpgo"
 						chmod -R 700 /opt/openssh/var /opt/openssh/etc
 						/opt/openssh/sbin/sshd -D >/dev/null 2>&1 &
 						;;

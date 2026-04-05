@@ -67,7 +67,7 @@ rsync --archive --ignore-times --itemize-changes --checksum --outbuf=L --log-fil
 
 # Rebinding storage paths
 printf "Rebinding Storage Paths\n"
-/opt/muos/script/mount/bind.sh >/dev/null
+/opt/muos/script/device/bind.sh >/dev/null
 
 # Sync and sleep for a bit - time for a rest!
 printf "Sync Filesystem\n"

@@ -23,3 +23,9 @@ case "$BOARD_NAME" in
 		echo 1 >/sys/class/pwm/pwmchip1/pwm0/enable
 		;;
 esac
+
+RUMBLE_SETTING=$(GET_VAR "config" "settings/advanced/rumble")
+RUMBLE_PIN=$(GET_VAR "device" "board/rumble")
+
+LOG_INFO "$0" 0 "BOOTING" "Device Rumble Check"
+case "$RUMBLE_SETTING" in 1 | 4 | 5) RUMBLE "$RUMBLE_PIN" 0.3 ;; esac

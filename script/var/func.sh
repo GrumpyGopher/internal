@@ -115,10 +115,6 @@ SETUP_STAGE_OVERLAY() {
 	export LD_PRELOAD
 }
 
-#:] ### Audio Mixer Reset
-#:] Ensures the primary audio source is at max volume and unmuted.
-#:] PipeWire will handle the volume independently. Of course the TrimUI
-#:] devices works completely backwards, so that is why it is set to '0'.
 RESET_MIXER() {
 	AUDIO_CONTROL=$(GET_VAR "device" "audio/control")
 	MAX_VOL=$(GET_VAR "device" "audio/max")

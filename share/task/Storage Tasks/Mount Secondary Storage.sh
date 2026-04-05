@@ -7,7 +7,7 @@
 FRONTEND stop
 
 echo "Trying to mount Secondary Storage"
-/opt/muos/script/mount/storage.sh "sdcard" "mount"
+/opt/muos/script/device/storage.sh "sdcard" "mount"
 
 echo "Sync Filesystem"
 sync
