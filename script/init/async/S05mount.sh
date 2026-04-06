@@ -23,10 +23,9 @@ mount -t configfs none /sys/kernel/config
 case "$BOARD_NAME" in
 	mgx*)
 		ELAPSED=0
-		while [ ! -d "/sys/module/fuse" ]; do
-			ELAPSED=$((ELAPSED + 1))
-			[ "$ELAPSED" -ge 100 ] && break
+		while [ ! -d "/sys/module/fuse" ] && [ "$ELAPSED" -lt 100 ]; do
 			sleep 0.1
+			ELAPSED=$((ELAPSED + 1))
 		done
 		;;
 esac
@@ -65,7 +64,7 @@ LOG_INFO "$0" 0 "BOOTING" "Checking for Safety Script"
 OOPS="$ROM_MOUNT/oops.sh"
 [ -x "$OOPS" ] && "$OOPS" && rm -f "$OOPS"
 
-if [ "${USER_INIT:-0}" -eq 1 ]; then
+[ "${USER_INIT:-0}" -eq 1 ] && {
 	LOG_INFO "$0" 0 "BOOTING" "Starting User Initialisation Scripts"
 	/opt/muos/script/system/user_init.sh &
-fi
+}

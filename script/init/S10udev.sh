@@ -2,8 +2,8 @@
 # shellcheck source=/dev/null
 
 UDEV_CONFIG="/etc/udev/udev.conf"
-test -r $UDEV_CONFIG || exit 6
-. $UDEV_CONFIG
+test -r "$UDEV_CONFIG" || exit 6
+. "$UDEV_CONFIG"
 
 case "$1" in
 	start)
@@ -20,7 +20,7 @@ case "$1" in
 		;;
 	stop)
 		udevadm control --stop-exec-queue
-		killall udevd
+		killall udevd 2>/dev/null
 		;;
 	*)
 		echo "Usage: $0 {start|stop}"

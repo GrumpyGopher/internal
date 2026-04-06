@@ -23,11 +23,11 @@ BOARD_NAME=$(GET_VAR "device" "board/name")
 
 if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
 	HDMI_VALUE=0
-	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && HDMI_VALUE=$(cat "$HDMI_PATH")
+	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && IFS= read -r HDMI_VALUE <"$HDMI_PATH"
 
 	case "$HDMI_VALUE" in
 		1) CONSOLE_MODE=1 ;;
-		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;;
+		*) CONSOLE_MODE=0 ;;
 	esac
 
 	SET_VAR "config" "boot/device_mode" "$CONSOLE_MODE"
@@ -47,7 +47,7 @@ else
 			*) /opt/muos/script/device/bright.sh "$BRIGHT_DEF" ;;
 		esac
 
-		printf '%s' "$COLOUR_TEMP" >"$COLOUR_PATH"
+		printf "%s" "$COLOUR_TEMP" >"$COLOUR_PATH"
 		SET_VAR "config" "settings/hdmi/scan" "0"
 	) &
 fi
@@ -63,7 +63,7 @@ fi
 (
 	if [ "$THERMAL" -eq 0 ]; then
 		for ZONE in /sys/class/thermal/thermal_zone*; do
-			[ -e "$ZONE/mode" ] && echo "disabled" >"$ZONE/mode"
+			[ -e "$ZONE/mode" ] && printf "disabled" >"$ZONE/mode"
 		done
 	fi
 ) &
@@ -79,15 +79,11 @@ rfkill unblock all 2>/dev/null
 EMU_VER=
 
 case "$BOARD_NAME" in
-	rg-vita*)
-		EMU_VER="vita"
-		;;
+	rg-vita*) EMU_VER="vita" ;;
 	rg*)
 		EMU_VER="rg"
 		case "$BOARD_NAME" in
-			rg34xx-sp | rg35xx-sp)
-				/opt/muos/script/device/lid.sh start &
-				;;
+			rg34xx-sp | rg35xx-sp) /opt/muos/script/device/lid.sh start & ;;
 		esac
 		;;
 	mgx* | tui*)
@@ -102,9 +98,7 @@ case "$BOARD_NAME" in
 		# Some stupid TrimUI GPU shenanigans
 		setalpha 0
 		;;
-	rk*)
-		EMU_VER="rk"
-		;;
+	rk*) EMU_VER="rk" ;;
 esac
 
 # Install a flat binary if its MD5 differs from the installed copy.
@@ -117,7 +111,7 @@ INSTALL_BIN() {
 
 	EXPECTED_MD5=$(cat "$SRC_MD5" 2>/dev/null) || return 0
 
-	CURRENT_MD5=""
+	CURRENT_MD5=
 	[ -f "$TGT_BIN" ] && CURRENT_MD5=$(md5sum "$TGT_BIN" | awk '{ print $1 }')
 
 	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
@@ -138,24 +132,24 @@ INSTALL_ARCHIVE() {
 
 	EXPECTED_MD5=$(cat "$MD5_FILE" 2>/dev/null) || return 0
 
-	CURRENT_MD5=""
+	CURRENT_MD5=
 	[ -f "$TGT_BIN" ] && CURRENT_MD5=$(md5sum "$TGT_BIN" | awk '{ print $1 }')
 
-	if [ "$CURRENT_MD5" != "$EXPECTED_MD5" ]; then
-		_INST_TMP=$(mktemp -d "${INSTALL_DIR}/tmp.XXXXXX") || return 1
-		gzip -dc -- "$ARCHIVE" | tar -xf - -C "$_INST_TMP"
+	[ "$CURRENT_MD5" = "$EXPECTED_MD5" ] && return 0
 
-		SRC_BIN=$(find "$_INST_TMP" -maxdepth 1 -type f -name "$GLOB" | head -n 1)
+	_INST_TMP=$(mktemp -d "${INSTALL_DIR}/tmp.XXXXXX") || return 1
+	gzip -dc -- "$ARCHIVE" | tar -xf - -C "$_INST_TMP"
 
-		if [ -n "$SRC_BIN" ]; then
-			cp -f "$SRC_BIN" "$TGT_BIN"
-			chmod +x "$TGT_BIN"
-		else
-			echo "Error: no $GLOB binary found in $ARCHIVE" >&2
-		fi
+	SRC_BIN=$(find "$_INST_TMP" -maxdepth 1 -type f -name "$GLOB" | head -n 1)
 
-		rm -rf "$_INST_TMP"
+	if [ -n "$SRC_BIN" ]; then
+		cp -f "$SRC_BIN" "$TGT_BIN"
+		chmod +x "$TGT_BIN"
+	else
+		printf "Error: no %s binary found in %s\n" "$GLOB" "$ARCHIVE" >&2
 	fi
+
+	rm -rf "$_INST_TMP"
 }
 
 RA_DIR="$MUOS_SHARE_DIR/emulator/retroarch"

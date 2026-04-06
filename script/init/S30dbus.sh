@@ -3,11 +3,9 @@
 PIDFILE="/run/messagebus.pid"
 LOCKFILE="/var/lock/subsys/dbus-daemon"
 
-mkdir -p "/run/dbus" "/var/lock/subsys" "/tmp/dbus"
-
 RET_VAL=0
 
-start() {
+START() {
 	printf "Starting system message bus: "
 
 	dbus-uuidgen --ensure
@@ -21,7 +19,7 @@ start() {
 	fi
 }
 
-stop() {
+STOP() {
 	printf "Stopping system message bus: "
 
 	if [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null; then
@@ -34,22 +32,20 @@ stop() {
 	fi
 }
 
+mkdir -p "/run/dbus" "/var/lock/subsys" "/tmp/dbus"
+
 case "$1" in
-	start)
-		start
-		;;
-	stop)
-		stop
-		;;
+	start) START ;;
+	stop) STOP ;;
 	restart)
-		stop
-		start
+		STOP
+		START
 		;;
 	condrestart)
-		if [ -f "$LOCKFILE" ]; then
-			stop
-			start
-		fi
+		[ -f "$LOCKFILE" ] && {
+			STOP
+			START
+		}
 		;;
 	reload)
 		echo "Message bus can't reload its configuration, you have to restart it"

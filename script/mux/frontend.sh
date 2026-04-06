@@ -30,27 +30,27 @@ if [ -n "$1" ]; then
 else
 	ACT="$STARTUP"
 fi
-printf '%s\n' "$ACT" >"$ACT_GO"
 
-echo "root" >"$EX_CARD"
+printf '%s\n' "$ACT" >"$ACT_GO"
+printf "root\n" >"$EX_CARD"
 
 LOG_INFO "$0" 0 "FRONTEND" "Setting default CPU governor"
 SET_DEFAULT_GOVERNOR
 
 if [ "$AUDIO_READY" -eq 1 ]; then
-	LOG_INFO "$0" 0 "BOOTING" "Waiting for Pipewire Init"
+	LOG_INFO "$0" 0 "BOOTING" "Waiting for PipeWire Initialisation"
 	until [ "$(GET_VAR "device" "audio/ready")" -eq 1 ]; do sleep 0.1; done
 fi
 
-LOG_INFO  "$0" 0 "BOOTING" "Restoring Saved Volume"
-RESTORE_AUDIO_VOLUME  || LOG_WARN "$0" 0 "BOOTING" "Unable to restore saved volume"
+LOG_INFO "$0" 0 "BOOTING" "Restoring Saved Volume"
+RESTORE_AUDIO_VOLUME || LOG_WARN "$0" 0 "BOOTING" "Unable to restore saved volume"
 
 if [ "$SKIP" -eq 0 ]; then
 	LOG_INFO "$0" 0 "FRONTEND" "Checking for last or resume startup"
 
-	if [ "$STARTUP" = "last" ] || [ "$STARTUP" = "resume" ]; then
-		/opt/muos/script/mux/resume.sh
-	fi
+	case "$STARTUP" in
+		last | resume) /opt/muos/script/mux/resume.sh ;;
+	esac
 fi
 
 BL_PATH="$ROM_MOUNT/MUOS/log/boot"
@@ -69,9 +69,8 @@ while :; do
 	# Reset ANALOGUE<>DIGITAL switch for the DPAD
 	if [ "$(GET_VAR "device" "board/stick")" -eq 0 ]; then
 		case "$BOARD_NAME" in
-			rg*) echo 0 >"$DPAD_SWAP" ;;
+			rg*) printf "0" >"$DPAD_SWAP" ;;
 			tui*) ENSURE_REMOVED "$DPAD_SWAP" ;;
-			*) ;;
 		esac
 	fi
 
@@ -79,84 +78,82 @@ while :; do
 	LOG_INFO "$0" 0 "FRONTEND" "Checking for Content Loader"
 	[ -s "$ROM_GO" ] && /opt/muos/script/mux/launch.sh
 
-	if [ -s "$ACT_GO" ]; then
-		IFS= read -r ACTION <"$ACT_GO"
+	[ -s "$ACT_GO" ] || continue
 
-		LOG_INFO "$0" 0 "FRONTEND" "$(printf "Loading '%s' Action" "$ACTION")"
+	IFS= read -r ACTION <"$ACT_GO"
 
-		case "$ACTION" in
-			"launcher")
-				LOG_INFO "$0" 0 "FRONTEND" "Clearing Content Setting files"
-				ENSURE_REMOVED "$GOV_GO"
-				ENSURE_REMOVED "$CON_GO"
-				ENSURE_REMOVED "$FLT_GO"
-				ENSURE_REMOVED "$RAC_GO"
+	LOG_INFO "$0" 0 "FRONTEND" "$(printf "Loading '%s' Action" "$ACTION")"
 
-				LOG_INFO "$0" 0 "FRONTEND" "Clearing Auto Assign flags"
-				ENSURE_REMOVED "$SAA_GO"
-				ENSURE_REMOVED "$SAG_GO"
-				ENSURE_REMOVED "$SAR_GO"
+	case "$ACTION" in
+		launcher)
+			LOG_INFO "$0" 0 "FRONTEND" "Clearing Content Setting files"
+			ENSURE_REMOVED "$GOV_GO"
+			ENSURE_REMOVED "$CON_GO"
+			ENSURE_REMOVED "$FLT_GO"
+			ENSURE_REMOVED "$RAC_GO"
 
-				LOG_INFO "$0" 0 "FRONTEND" "Setting Governor back to default"
-				SET_DEFAULT_GOVERNOR
+			LOG_INFO "$0" 0 "FRONTEND" "Clearing Auto Assign flags"
+			ENSURE_REMOVED "$SAA_GO"
+			ENSURE_REMOVED "$SAG_GO"
+			ENSURE_REMOVED "$SAR_GO"
 
-				touch "/tmp/pdi_go"
+			LOG_INFO "$0" 0 "FRONTEND" "Setting Governor back to default"
+			SET_DEFAULT_GOVERNOR
 
-				EXEC_MUX "launcher" "muxfrontend"
-				;;
+			touch "/tmp/pdi_go"
 
-			"explore") EXEC_MUX "explore" "muxfrontend" ;;
+			EXEC_MUX "launcher" "muxfrontend"
+			;;
 
-			"app")
-				if [ -s "$APP_GO" ]; then
-					IFS= read -r RUN_APP <"$APP_GO"
-					ENSURE_REMOVED "$APP_GO"
+		explore) EXEC_MUX "explore" "muxfrontend" ;;
 
-					SETUP_APP
-					"$RUN_APP"/mux_launch.sh "$RUN_APP"
+		app)
+			if [ -s "$APP_GO" ]; then
+				IFS= read -r RUN_APP <"$APP_GO"
+				ENSURE_REMOVED "$APP_GO"
 
-					CONTENT_UNSET
-					echo appmenu >"$ACT_GO"
+				SETUP_APP
+				"$RUN_APP"/mux_launch.sh "$RUN_APP"
 
-					LOG_INFO "$0" 0 "FRONTEND" "Clearing Governor and Control Scheme files"
-					ENSURE_REMOVED "$GOV_GO"
-					ENSURE_REMOVED "$CON_GO"
+				CONTENT_UNSET
+				printf "appmenu\n" >"$ACT_GO"
 
-					LOG_INFO "$0" 0 "FRONTEND" "Setting Governor back to default"
-					SET_DEFAULT_GOVERNOR
-				fi
-				;;
-
-			"appmenu")
 				LOG_INFO "$0" 0 "FRONTEND" "Clearing Governor and Control Scheme files"
 				ENSURE_REMOVED "$GOV_GO"
 				ENSURE_REMOVED "$CON_GO"
 
 				LOG_INFO "$0" 0 "FRONTEND" "Setting Governor back to default"
 				SET_DEFAULT_GOVERNOR
+			fi
+			;;
 
-				EXEC_MUX "app" "muxfrontend"
-				;;
+		appmenu)
+			LOG_INFO "$0" 0 "FRONTEND" "Clearing Governor and Control Scheme files"
+			ENSURE_REMOVED "$GOV_GO"
+			ENSURE_REMOVED "$CON_GO"
 
-			"collection") EXEC_MUX "collection" "muxfrontend" ;;
+			LOG_INFO "$0" 0 "FRONTEND" "Setting Governor back to default"
+			SET_DEFAULT_GOVERNOR
 
-			"history") EXEC_MUX "history" "muxfrontend" ;;
+			EXEC_MUX "app" "muxfrontend"
+			;;
 
-			"info") EXEC_MUX "info" "muxfrontend" ;;
+		collection) EXEC_MUX "collection" "muxfrontend" ;;
+		history) EXEC_MUX "history" "muxfrontend" ;;
+		info) EXEC_MUX "info" "muxfrontend" ;;
 
-			"credits")
-				/opt/muos/bin/nosefart "$MUOS_SHARE_DIR/media/support.nsf" >/dev/null 2>&1 &
-				EXEC_MUX "info" "muxcredits"
-				pkill -9 -f "nosefart" &
-				;;
+		credits)
+			/opt/muos/bin/nosefart "$MUOS_SHARE_DIR/media/support.nsf" >/dev/null 2>&1 &
+			EXEC_MUX "info" "muxcredits"
+			pkill -9 -f "nosefart" &
+			;;
 
-			"reboot") /opt/muos/script/mux/quit.sh reboot frontend ;;
-			"shutdown") /opt/muos/script/mux/quit.sh poweroff frontend ;;
+		reboot) /opt/muos/script/mux/quit.sh reboot frontend ;;
+		shutdown) /opt/muos/script/mux/quit.sh poweroff frontend ;;
 
-			*)
-				printf "Unknown Module: %s\n" "$ACTION" >&2
-				EXEC_MUX "$ACTION" "muxfrontend"
-				;;
-		esac
-	fi
+		*)
+			printf "Unknown Module: %s\n" "$ACTION" >&2
+			EXEC_MUX "$ACTION" "muxfrontend"
+			;;
+	esac
 done

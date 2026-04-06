@@ -60,7 +60,6 @@ LOG_INFO "$0" 0 "BOOTING" "Precaching Content Mounts"
 	for STORAGE_MOUNT in $ROM_MOUNT $SDCARD_MOUNT $USB_MOUNT; do
 		[ -d "$STORAGE_MOUNT/ROMS" ] || continue
 
-		find "$STORAGE_MOUNT/ROMS" -maxdepth 2 -type d >/dev/null
 		nice -n 19 ionice -c3 find "$STORAGE_MOUNT/ROMS" -maxdepth 4 >/dev/null
 	done
 ) &

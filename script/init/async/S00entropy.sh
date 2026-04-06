@@ -4,8 +4,8 @@ ENTROPY_FILE="/proc/sys/kernel/random/entropy_avail"
 ENTROPY_TARGET=256
 
 ENTROPY_OK() {
-	CURRENT_ENTROPY=$(cat "$ENTROPY_FILE" 2>/dev/null)
-	[ -n "$CURRENT_ENTROPY" ] && [ "$CURRENT_ENTROPY" -ge "$ENTROPY_TARGET" ]
+	CURRENT=$(cat "$ENTROPY_FILE" 2>/dev/null)
+	[ -n "$CURRENT" ] && [ "$CURRENT" -ge "$ENTROPY_TARGET" ]
 }
 
 START() {
@@ -13,16 +13,12 @@ START() {
 }
 
 STOP() {
-	killall -9 haveged
+	killall -9 haveged 2>/dev/null
 }
 
 case "$1" in
-	start)
-		START
-		;;
-	stop)
-		STOP
-		;;
+	start) START ;;
+	stop) STOP ;;
 	restart)
 		STOP
 		START
@@ -42,4 +38,4 @@ case "$1" in
 		;;
 esac
 
-exit $?
+exit 0

@@ -23,8 +23,7 @@ INTERVAL=100
 
 SOCKET_READY() {
 	[ -S "$PW_SOCKET" ] || return 1
-	pw-cli info 0 >/dev/null 2>&1 || return 1
-	return 0
+	pw-cli info 0 >/dev/null 2>&1
 }
 
 PROC_RUNNING() {
@@ -42,6 +41,20 @@ PROC_GONE() {
 	done
 
 	return 0
+}
+
+WAIT_UNTIL() {
+	COND_FN="$1"
+	ARG="${2:-}"
+	ELAPSED=0
+
+	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+		"$COND_FN" "$ARG" && return 0
+		sleep 0.1
+		ELAPSED=$((ELAPSED + INTERVAL))
+	done
+
+	return 1
 }
 
 RESTORE_CONF() {
@@ -78,43 +91,13 @@ GET_NODE_ID() {
 		awk -F '\t' -v target="$TARGET_NAME" '$2 == target { print $1; exit }'
 }
 
-WAIT_FOR_DBUS() {
-	ELAPSED=0
-
-	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		[ -S "$DBUS_SOCKET" ] && return 0
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-	done
-
-	return 1
+NODE_VISIBLE() {
+	NODE_ID=$(GET_NODE_ID "$1")
+	[ -n "$NODE_ID" ]
 }
 
-WAIT_FOR_PIPEWIRE_SOCKET() {
-	ELAPSED=0
-
-	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		SOCKET_READY && return 0
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-	done
-
-	return 1
-}
-
-WAIT_FOR_TARGET_NODE() {
-	TARGET_NAME=$1
-	ELAPSED=0
-
-	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
-		NODE_ID=$(GET_NODE_ID "$TARGET_NAME")
-		[ -n "$NODE_ID" ] && return 0
-
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-	done
-
-	return 1
+DBUS_READY() {
+	[ -S "$DBUS_SOCKET" ]
 }
 
 GET_BOOT_RUNTIME_PERCENT() {
@@ -123,31 +106,36 @@ GET_BOOT_RUNTIME_PERCENT() {
 		return 0
 	fi
 
-	case "$ADV_VOL" in
-		1) printf "0\n" ;;
-		2) printf "35\n" ;;
-		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
-	esac
+	ADV_VOL_TO_PERCENT "$ADV_VOL"
 }
 
 GET_BOOT_SAVED_VOLUME() {
 	case "$ADV_VOL" in
-		1) printf "0\n" ;;
-		2) printf "35\n" ;;
-		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
+		1 | 2 | 3) ADV_VOL_TO_PERCENT "$ADV_VOL" ;;
 		*) GET_SAVED_AUDIO_VOLUME ;;
 	esac
 }
 
+ADV_VOL_TO_PERCENT() {
+	case "$1" in
+		1) printf "0\n" ;;
+		2) printf "35\n" ;;
+		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
+	esac
+}
+
 INSTALL_WIREPLUMBER_CONF() {
+	# Determine the WirePlumber minor version to select the correct config format.
 	WP_MINOR=$(wireplumber --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 | cut -d. -f2)
 
 	if [ "${WP_MINOR:-0}" -ge 5 ]; then
-		# WirePlumber 5 (vita pro)
-		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.conf" "/usr/share/wireplumber/wireplumber.conf.d/60-muos-wireplumber.conf"
+		# WirePlumber 5+
+		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.conf" \
+			"/usr/share/wireplumber/wireplumber.conf.d/60-muos-wireplumber.conf"
 	else
 		# WirePlumber 4
-		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" "/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
+		RESTORE_CONF "$MUOS_SHARE_DIR/conf/wireplumber.lua" \
+			"/usr/share/wireplumber/main.lua.d/60-muos-wireplumber.lua"
 	fi
 }
 
@@ -186,11 +174,11 @@ FINALISE_AUDIO() {
 	TARGET_NAME=$(GET_TARGET_NODE)
 	RUNTIME_PERCENT=$(GET_BOOT_RUNTIME_PERCENT)
 	SAVED_VOL=$(GET_BOOT_SAVED_VOLUME)
-	DEF_ID=
 
 	SET_SAVED_AUDIO_VOLUME "$SAVED_VOL"
 
-	if ! WAIT_FOR_TARGET_NODE "$TARGET_NAME"; then
+	# Wait for the target node to appear, then resolve its ID once and cache it.
+	if ! WAIT_UNTIL NODE_VISIBLE "$TARGET_NAME"; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Target node '%s' not ready after timeout" "$TARGET_NAME")"
 		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		return 1
@@ -198,14 +186,13 @@ FINALISE_AUDIO() {
 
 	DEF_ID=$(GET_NODE_ID "$TARGET_NAME")
 	if [ -z "$DEF_ID" ]; then
-		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to resolve node id for target '%s'" "$TARGET_NAME")"
+		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to resolve node ID for target '%s'" "$TARGET_NAME")"
 		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		return 1
 	fi
 
-	if ! wpctl set-default "$DEF_ID" >/dev/null 2>&1; then
+	wpctl set-default "$DEF_ID" >/dev/null 2>&1 ||
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "Unable to set default node '%s'" "$DEF_ID")"
-	fi
 
 	APPLY_VOL=${RUNTIME_PERCENT:-$SAVED_VOL}
 	wpctl set-volume @DEFAULT_AUDIO_SINK@ "${APPLY_VOL}%" >/dev/null 2>&1
@@ -215,7 +202,7 @@ FINALISE_AUDIO() {
 
 	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 
-	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "Audio Finalised (node=%s, volume=%s%%)" "$DEF_ID" "$APPLY_VOL")"
+	LOG_SUCCESS "$0" 0 "PIPEWIRE" "$(printf "Audio finalised (node=%s, volume=%s%%)" "$DEF_ID" "$APPLY_VOL")"
 	return 0
 }
 
@@ -225,7 +212,7 @@ DO_START() {
 	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring Default Sound System"
 	RESTORE_CONF "$MUOS_SHARE_DIR/conf/asound.conf" "/etc/asound.conf"
 
-	LOG_INFO "$0" 0 "PIPEWIRE" "ALSA Config Restoring"
+	LOG_INFO "$0" 0 "PIPEWIRE" "Restoring ALSA Config"
 	RESTORE_CONF "$MUOS_SHARE_DIR/conf/alsa.conf" "/usr/share/alsa/alsa.conf"
 
 	if ! START_PIPEWIRE; then
@@ -234,11 +221,11 @@ DO_START() {
 		exit 1
 	fi
 
-	if ! WAIT_FOR_DBUS; then
+	if ! WAIT_UNTIL DBUS_READY; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "D-Bus not ready after timeout; proceeding"
 	fi
 
-	if ! WAIT_FOR_PIPEWIRE_SOCKET; then
+	if ! WAIT_UNTIL SOCKET_READY; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket '%s' not ready after timeout" "$PW_SOCKET")"
 		[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "1"
 		exit 1
@@ -252,10 +239,7 @@ DO_START() {
 
 	RESET_MIXER
 
-	if ! FINALISE_AUDIO; then
-		exit 1
-	fi
-
+	FINALISE_AUDIO || exit 1
 	exit 0
 }
 
@@ -315,7 +299,7 @@ PRINT_STATUS() {
 
 	if [ "$SOCK" -eq 1 ]; then
 		pw-cli ls Node 2>/dev/null | grep -q "Audio/Sink" && SINK=1
-		DEF_SINK=$(wpctl status 2>/dev/null | awk -F': ' '/Default Sink:/ {print $2; exit}')
+		DEF_SINK=$(wpctl status 2>/dev/null | awk -F': ' '/Default Sink:/ { print $2; exit }')
 	fi
 
 	PW_PID=$(pgrep -o -x pipewire 2>/dev/null)
@@ -346,7 +330,7 @@ case "${1:-}" in
 		exit "$?"
 		;;
 	*)
-		printf "Usage: %s {start | stop | restart | reload | status}\n" "$0"
+		printf "Usage: %s {start|stop|restart|reload|status}\n" "$0"
 		exit 1
 		;;
 esac

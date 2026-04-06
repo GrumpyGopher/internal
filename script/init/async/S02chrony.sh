@@ -13,10 +13,7 @@ case "$(GET_VAR "device" "board/name")" in
 esac
 
 IS_RUNNING() {
-	if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-		return 0
-	fi
-
+	[ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null && return 0
 	pidof chronyd >/dev/null 2>&1
 }
 
@@ -29,23 +26,21 @@ case "$1" in
 
 		echo "Starting chronyd"
 		"$DAEMON" -f "$CONF" >/dev/null 2>&1 &
-		echo "$!" >"$PID_FILE"
+		printf "%s" "$!" >"$PID_FILE"
 		;;
 
 	stop)
 		if IS_RUNNING; then
 			echo "Stopping chronyd"
-			if [ -f "$PID_FILE" ]; then
-				kill "$(cat "$PID_FILE")" 2>/dev/null
-				rm -f "$PID_FILE"
-			fi
+			[ -f "$PID_FILE" ] && kill "$(cat "$PID_FILE")" 2>/dev/null
+			rm -f "$PID_FILE"
 			killall chronyd 2>/dev/null
 		else
 			echo "chronyd not running"
 		fi
 		;;
 
-	restart|reload)
+	restart | reload)
 		"$0" stop
 		"$0" start
 		;;
