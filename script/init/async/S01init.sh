@@ -13,6 +13,17 @@ echo "performance" >"$GOVERNOR"
 
 [ -f "$LED_CONTROL_SCRIPT" ] && "$LED_CONTROL_SCRIPT" 1 0 0 0 0 0 0 0
 
+if [ "$DEBUG_FS" -eq 1 ]; then
+	mount -t debugfs debugfs /sys/kernel/debug
+fi
+
+/opt/muos/script/device/module.sh load
+
+if [ "$FACTORY_RESET" -eq 1 ]; then
+	LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
+	/opt/muos/frontend/muxwarn &
+fi
+
 mkdir -p "/tmp/muos"
 rm -rf "$MUOS_LOG_DIR"/*.log "/opt/muxtmp"
 
@@ -28,6 +39,9 @@ LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
 echo 1 >"$MUOS_RUN_DIR/work_led_state"
 : >"$MUOS_RUN_DIR/net_start"
 
+LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
+BATTERY start
+
 LOG_INFO "$0" 0 "BOOTING" "Reset temporary screen rotation and zoom"
 SCREEN_DIR="/opt/muos/device/config/screen"
 rm -f "$SCREEN_DIR/s_rotate" "$SCREEN_DIR/s_zoom" &
@@ -39,14 +53,3 @@ SET_VAR "device" "mux/width" "$WIDTH" &
 SET_VAR "device" "mux/height" "$HEIGHT" &
 
 sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
-
-if [ "$DEBUG_FS" -eq 1 ]; then
-	mount -t debugfs debugfs /sys/kernel/debug
-fi
-
-/opt/muos/script/device/module.sh load
-
-if [ "$FACTORY_RESET" -eq 1 ]; then
-	LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
-	/opt/muos/frontend/muxwarn &
-fi

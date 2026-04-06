@@ -3,6 +3,8 @@
 . /opt/muos/script/var/func.sh
 
 FACTORY_RESET=$(GET_VAR "config" "boot/factory_reset")
+[ "$FACTORY_RESET" -eq 1 ] && exit 0
+
 HDMI_PATH=$(GET_VAR "device" "screen/hdmi")
 BOARD_HDMI=$(GET_VAR "device" "board/hdmi")
 DEVICE_MODE=$(GET_VAR "config" "boot/device_mode")
@@ -18,8 +20,6 @@ OVERDRIVE=$(GET_VAR "config" "settings/advanced/overdrive")
 THERMAL=$(GET_VAR "config" "settings/advanced/thermal")
 
 BOARD_NAME=$(GET_VAR "device" "board/name")
-
-[ "$FACTORY_RESET" -eq 1 ] && exit 0
 
 if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
 	HDMI_VALUE=0

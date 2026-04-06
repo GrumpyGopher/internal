@@ -3,6 +3,7 @@
 . /opt/muos/script/var/func.sh
 
 FACTORY_RESET=$(GET_VAR "config" "boot/factory_reset")
+[ "$FACTORY_RESET" -eq 1 ] && exit 0
 
 BOARD_NAME=$(GET_VAR "device" "board/name")
 ROM_MOUNT=$(GET_VAR "device" "storage/rom/mount")
@@ -14,8 +15,6 @@ BOOT_TYPE=$(GET_VAR "device" "storage/boot/type")
 BOOT_MOUNT=$(GET_VAR "device" "storage/boot/mount")
 
 USER_INIT=$(GET_VAR "config" "settings/advanced/user_init")
-
-[ "$FACTORY_RESET" -eq 1 ] && exit 0
 
 mount -t configfs none /sys/kernel/config
 

@@ -2,43 +2,50 @@
 # shellcheck source=/dev/null
 
 INIT_DIR="/opt/muos/script/init"
-ASYNC_DIR="$INIT_DIR/async"
 
-run_stop_script() {
-	S="$1"
+RUN_SCRIPT() {
+	SCRIPT="$1"
 
-	[ -e "$S" ] || return 0
-	[ -f "$S" ] || return 0
+	[ -e "$SCRIPT" ] || return 0
+	[ -f "$SCRIPT" ] || return 0
 
-	case "$S" in
+	case "$SCRIPT" in
 		*.sh)
 			(
 				trap - INT QUIT TSTP
 				set stop
-				. "$S"
+				. "$SCRIPT"
 			)
 			;;
 		*)
-			"$S" stop
+			"$SCRIPT" stop
 			;;
 	esac
 }
 
-reverse_run_dir() {
+RUN_NORMAL() {
 	DIR="$1"
 
 	[ -d "$DIR" ] || return 0
 
-	for S in $(printf '%s\n' "$DIR"/S??* | sort -r); do
-		[ -e "$S" ] || continue
-		run_stop_script "$S"
+	for SCRIPT in $(printf '%s\n' "$DIR"/S??* | sort -r); do
+		[ -e "$SCRIPT" ] || continue
+		RUN_SCRIPT "$SCRIPT"
 	done
 }
 
-# Stop async services first
-reverse_run_dir "$ASYNC_DIR"
+RUN_ASYNC() {
+	DIR="$1"
 
-# Then stop normal init scripts
-reverse_run_dir "$INIT_DIR"
+	[ -d "$DIR" ] || return 0
+
+	for SCRIPT in $(printf '%s\n' "$DIR"/S??* | sort -r); do
+		[ -e "$SCRIPT" ] || continue
+		(RUN_SCRIPT "$SCRIPT") >/dev/null 2>&1 &
+	done
+}
+
+RUN_ASYNC "$INIT_DIR/async"
+RUN_NORMAL "$INIT_DIR"
 
 exit 0

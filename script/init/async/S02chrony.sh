@@ -12,7 +12,7 @@ case "$(GET_VAR "device" "board/name")" in
 	rg*) ln -sf "rtc1" "/dev/rtc" ;;
 esac
 
-is_running() {
+IS_RUNNING() {
 	if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
 		return 0
 	fi
@@ -22,7 +22,7 @@ is_running() {
 
 case "$1" in
 	start)
-		if is_running; then
+		if IS_RUNNING; then
 			echo "chronyd already running"
 			exit 0
 		fi
@@ -33,7 +33,7 @@ case "$1" in
 		;;
 
 	stop)
-		if is_running; then
+		if IS_RUNNING; then
 			echo "Stopping chronyd"
 			if [ -f "$PID_FILE" ]; then
 				kill "$(cat "$PID_FILE")" 2>/dev/null
@@ -51,7 +51,7 @@ case "$1" in
 		;;
 
 	status)
-		if is_running; then
+		if IS_RUNNING; then
 			echo "chronyd is running"
 		else
 			echo "chronyd is stopped"
