@@ -2,61 +2,58 @@
 
 . /opt/muos/script/var/func.sh
 
-[ "$FACTORY_RESET" -eq 1 ] && exit 0
-
+FACTORY_RESET=$(GET_VAR "config" "boot/factory_reset")
 HDMI_PATH=$(GET_VAR "device" "screen/hdmi")
 BOARD_HDMI=$(GET_VAR "device" "board/hdmi")
+DEVICE_MODE=$(GET_VAR "config" "boot/device_mode")
 
-sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
+BRIGHT_ADV=$(GET_VAR "config" "settings/advanced/brightness")
+BRIGHT_DEF=$(GET_VAR "config" "settings/general/brightness")
+BRIGHT_MAX=$(GET_VAR "device" "screen/bright")
 
-if [ "$(GET_VAR "device" "board/debugfs")" -eq 1 ]; then
-	mount -t debugfs debugfs /sys/kernel/debug
-fi
+COLOUR_TEMP=$(GET_VAR "config" "settings/colour/temperature")
+COLOUR_PATH=$(GET_VAR "device" "screen/colour")
 
-if [ "$FIRST_INIT" -eq 1 ]; then
-	if [ "$FACTORY_RESET" -eq 0 ]; then
-		/opt/muos/script/device/module.sh load &
-	fi
-else
-	/opt/muos/script/device/module.sh load &
+OVERDRIVE=$(GET_VAR "config" "settings/advanced/overdrive")
+THERMAL=$(GET_VAR "config" "settings/advanced/thermal")
 
-	if [ "$FACTORY_RESET" -eq 1 ]; then
-		LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
-		/opt/muos/frontend/muxwarn &
-	fi
-fi
+BOARD_NAME=$(GET_VAR "device" "board/name")
+
+[ "$FACTORY_RESET" -eq 1 ] && exit 0
 
 if [ "${BOARD_HDMI:-0}" -eq 1 ]; then
+	HDMI_VALUE=0
 	[ -n "$HDMI_PATH" ] && [ -f "$HDMI_PATH" ] && HDMI_VALUE=$(cat "$HDMI_PATH")
 
 	case "$HDMI_VALUE" in
-		1) CONSOLE_MODE=1 ;; # HDMI is active = external
-		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;; # Non-numeric, 0, or fallback = internal
+		1) CONSOLE_MODE=1 ;;
+		*[!0-9]* | 0 | *) CONSOLE_MODE=0 ;;
 	esac
 
 	SET_VAR "config" "boot/device_mode" "$CONSOLE_MODE"
+	DEVICE_MODE="$CONSOLE_MODE"
 fi
 
-if [ "$(GET_VAR "config" "boot/device_mode")" -eq 1 ]; then
+if [ "$DEVICE_MODE" -eq 1 ]; then
 	/opt/muos/script/device/hdmi.sh &
 else
 	(
 		/opt/muos/script/device/bright.sh R
 
-		case "$(GET_VAR "config" "settings/advanced/brightness")" in
-			3) /opt/muos/script/device/bright.sh "$(GET_VAR "device" "screen/bright")" ;;
+		case "$BRIGHT_ADV" in
+			3) /opt/muos/script/device/bright.sh "$BRIGHT_MAX" ;;
 			2) /opt/muos/script/device/bright.sh 90 ;;
 			1) /opt/muos/script/device/bright.sh 35 ;;
-			*) /opt/muos/script/device/bright.sh "$(GET_VAR "config" "settings/general/brightness")" ;;
+			*) /opt/muos/script/device/bright.sh "$BRIGHT_DEF" ;;
 		esac
 
-		GET_VAR "config" "settings/colour/temperature" >"$(GET_VAR "device" "screen/colour")"
+		printf '%s' "$COLOUR_TEMP" >"$COLOUR_PATH"
 		SET_VAR "config" "settings/hdmi/scan" "0"
 	) &
 fi
 
 (
-	if [ "$(GET_VAR "config" "settings/advanced/overdrive")" -eq 1 ]; then
+	if [ "$OVERDRIVE" -eq 1 ]; then
 		SET_VAR "device" "audio/max" "200"
 	else
 		SET_VAR "device" "audio/max" "100"
@@ -64,7 +61,7 @@ fi
 ) &
 
 (
-	if [ "$(GET_VAR "config" "settings/advanced/thermal")" -eq 0 ]; then
+	if [ "$THERMAL" -eq 0 ]; then
 		for ZONE in /sys/class/thermal/thermal_zone*; do
 			[ -e "$ZONE/mode" ] && echo "disabled" >"$ZONE/mode"
 		done
@@ -79,7 +76,6 @@ rfkill unblock all 2>/dev/null
 # Calibrate user setting joystick values if set
 /opt/muos/script/device/joycal.sh &
 
-BOARD_NAME=$(GET_VAR "device" "board/name")
 EMU_VER=
 
 case "$BOARD_NAME" in

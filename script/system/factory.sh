@@ -2,8 +2,11 @@
 
 . /opt/muos/script/var/func.sh
 
-if [ "$(GET_VAR "device" "led/rgb")" -eq 1 ]; then
-	case "$(GET_VAR "device" "board/name")" in
+LED_RGB=$(GET_VAR "device" "led/rgb")
+BOARD_NAME=$(GET_VAR "device" "board/name")
+
+if [ "$LED_RGB" -eq 1 ]; then
+	case "$BOARD_NAME" in
 		rg*) /opt/muos/script/device/rgb.sh 2 255 225 173 1 ;;
 		tui-brick) /opt/muos/script/device/rgb.sh 1 10 225 173 1 225 173 1 225 173 1 225 173 1 225 173 1 ;;
 		tui-spoon) /opt/muos/script/device/rgb.sh 1 10 225 173 1 225 173 1 225 173 1 ;;
@@ -23,10 +26,11 @@ printf "installer" >"/tmp/act_go"
 printf 0 >"/tmp/msg_progress"
 [ -f "/tmp/msg_finish" ] && rm -f "/tmp/msg_finish"
 
+LOG_INFO "$0" 0 "FACTORY RESET" "Starting Hotkey Daemon"
+HOTKEY start
+
 /opt/muos/frontend/muxmessage 0 "$MUOS_SHARE_DIR/message.txt" -d 5
 
-LOG_INFO "$0" 0 "FACTORY RESET" "Starting Hotkey Daemon"
-/opt/muos/script/mux/hotkey.sh &
 /usr/bin/mpv --really-quiet "$MUOS_SHARE_DIR/media/factory.mp3" &
 
 LOG_INFO "$0" 0 "FACTORY RESET" "Generating SSH Host Keys"

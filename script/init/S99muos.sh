@@ -14,11 +14,7 @@ if [ "${CONSOLE_MODE:-0}" -eq 0 ]; then
 	LED_CONTROL_CHANGE
 fi
 
-LOG_INFO "$0" 0 "BOOTING" "Starting Hotkey Daemon"
-HOTKEY start
-
-FACTORY_RESET=$(GET_VAR "config" "boot/factory_reset")
-if [ "$FACTORY_RESET" -eq 1 ]; then
+if [ "$(GET_VAR "config" "boot/factory_reset")" -eq 1 ]; then
 	LED_CONTROL_CHANGE &
 
 	/opt/muos/script/system/factory.sh
@@ -26,6 +22,9 @@ if [ "$FACTORY_RESET" -eq 1 ]; then
 
 	exit 0
 fi
+
+LOG_INFO "$0" 0 "BOOTING" "Starting Hotkey Daemon"
+HOTKEY start
 
 LOG_INFO "$0" 0 "BOOTING" "Starting muX Frontend"
 FRONTEND start

@@ -2,8 +2,9 @@
 
 . /opt/muos/script/var/func.sh
 
+FACTORY_RESET=$(GET_VAR "config" "boot/factory_reset")
 GOVERNOR=$(GET_VAR "device" "cpu/governor")
-
+DEBUG_FS=$(GET_VAR "device" "board/debugfs")
 WIDTH=$(GET_VAR "device" "screen/internal/width")
 HEIGHT=$(GET_VAR "device" "screen/internal/height")
 
@@ -36,3 +37,16 @@ SET_VAR "device" "screen/width" "$WIDTH" &
 SET_VAR "device" "screen/height" "$HEIGHT" &
 SET_VAR "device" "mux/width" "$WIDTH" &
 SET_VAR "device" "mux/height" "$HEIGHT" &
+
+sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
+
+if [ "$DEBUG_FS" -eq 1 ]; then
+	mount -t debugfs debugfs /sys/kernel/debug
+fi
+
+/opt/muos/script/device/module.sh load
+
+if [ "$FACTORY_RESET" -eq 1 ]; then
+	LOG_INFO "$0" 0 "BOOTING" "Loading First Init Disclaimer"
+	/opt/muos/frontend/muxwarn &
+fi
