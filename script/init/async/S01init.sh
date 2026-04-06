@@ -8,6 +8,9 @@ DEBUG_FS=$(GET_VAR "device" "board/debugfs")
 WIDTH=$(GET_VAR "device" "screen/internal/width")
 HEIGHT=$(GET_VAR "device" "screen/internal/height")
 
+LOG_INFO "$0" 0 "BOOTING" "Creating Required Run Directory"
+mkdir -p "$MUOS_RUN_DIR"
+
 LOG_INFO "$0" 0 "BOOTING" "Setting 'performance' Governor"
 echo "performance" >"$GOVERNOR"
 
