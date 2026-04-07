@@ -3,7 +3,7 @@
     "rg34xx-sp",
     "rg35xx-sp"
   ],
-  "SLEEP_SHORT": {
+  "SLEEP_LONG": {
     "handle_hold": false,
     "inputs": [
       "LID_CLOSE"
