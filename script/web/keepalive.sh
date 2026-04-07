@@ -22,10 +22,10 @@ while :; do
 	if ! ping -c 1 -s 8 "$DNS_SERVER" >/dev/null 2>&1; then
 		if ! ping -c 1 -s 8 "$FALLBACK_IP" >/dev/null 2>&1; then
 			printf "Network failure detected. Disconnecting...\n"
-			/opt/muos/script/system/network.sh disconnect
+			/opt/muos/script/init/async/S02network.sh stop
 			if [ "$(GET_VAR "config" "settings/network/monitor")" -eq 1 ]; then
 				printf "Trying to reconnect to network...\n"
-				/opt/muos/script/system/network.sh connect
+				/opt/muos/script/init/async/S02network.sh start
 			fi
 		fi
 	fi

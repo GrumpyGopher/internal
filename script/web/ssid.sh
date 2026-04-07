@@ -27,8 +27,8 @@ HEX_ESCAPE() {
 }
 
 case "$(GET_VAR "device" "board/name")" in
-	rg*) [ ! -d "/sys/bus/mmc/devices/mmc2:0001" ] && /opt/muos/script/device/network.sh load ;;
-	rk* | tui*) /opt/muos/script/device/network.sh load ;;
+	rg*) [ ! -d "/sys/bus/mmc/devices/mmc2:0001" ] && /opt/muos/script/init/async/S02network.sh start ;;
+	rk* | tui*) /opt/muos/script/init/async/S02network.sh start ;;
 	*) ;;
 esac
 
@@ -54,5 +54,5 @@ printf '%s\n' "$SCAN_DATA" |
 	sort -u |
 	HEX_ESCAPE >>"$NET_SCAN"
 
-/opt/muos/script/system/network.sh disconnect
+/opt/muos/script/init/async/S02network.sh stop
 [ ! -s "$NET_SCAN" ] && printf "[!]" >"$NET_SCAN"

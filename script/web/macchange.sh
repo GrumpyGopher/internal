@@ -7,8 +7,8 @@ HAS_NETWORK=$(GET_VAR "device" "board/network")
 
 IFCE=$(GET_VAR "device" "network/iface")
 
-/opt/muos/script/system/network.sh disconnect
-/opt/muos/script/device/network.sh load
+/opt/muos/script/init/async/S02network.sh stop
+/opt/muos/script/init/async/S02network.sh start
 
 WAIT_IFACE=20
 while [ "$WAIT_IFACE" -gt 0 ]; do
@@ -22,4 +22,4 @@ ip link set dev "$IFCE" down
 NEW_MAC=$(/usr/bin/macchanger -r "$IFCE" | awk '/^New MAC:/{print $3}')
 
 SET_VAR "config" "network/mac" "$NEW_MAC"
-/opt/muos/script/device/network.sh unload
+/opt/muos/script/init/async/S02network.sh stop

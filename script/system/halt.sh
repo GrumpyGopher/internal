@@ -193,8 +193,7 @@ fi
 
 if [ "$(GET_VAR "device" "board/network")" -eq 1 ]; then
 	LOG_INFO "$0" 0 "HALT" "Stopping Network"
-	/opt/muos/script/system/network.sh disconnect
-	/opt/muos/script/device/network.sh unload
+	/opt/muos/script/init/async/S02network.sh stop
 fi
 
 LOG_INFO "$0" 0 "HALT" "Stopping Pipewire"

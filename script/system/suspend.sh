@@ -127,7 +127,7 @@ SLEEP() {
 	esac
 
 	if [ "$HAS_NETWORK" -eq 1 ]; then
-		/opt/muos/script/system/network.sh disconnect
+		/opt/muos/script/init/async/S02network.sh stop
 	fi
 
 	/opt/muos/script/device/module.sh unload
@@ -160,7 +160,7 @@ RESUME() {
 	wait "$MODULE_PID"
 
 	if [ "$HAS_NETWORK" -eq 1 ] && [ "$CONNECT_ON_WAKE" -eq 1 ]; then
-		/opt/muos/script/system/network.sh connect &
+		/opt/muos/script/init/async/S02network.sh start &
 	fi
 
 	ACTIVITY_TRACKER resume &

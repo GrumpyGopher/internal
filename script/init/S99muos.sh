@@ -40,18 +40,6 @@ HOTKEY start
 LOG_INFO "$0" 0 "BOOTING" "Starting muX Frontend"
 FRONTEND start
 
-LOG_INFO "$0" 0 "BOOTING" "Bringing Up 'localhost' Network"
-ifconfig lo up &
-
-LOG_INFO "$0" 0 "BOOTING" "Connecting Network on Boot if requested and possible"
-if [ "${HAS_NETWORK:-0}" -eq 1 ] && [ "${CONNECT_ON_BOOT:-0}" -eq 1 ]; then
-	if [ "${NET_ASYNC:-0}" -eq 1 ]; then
-		/opt/muos/script/system/network.sh connect &
-	else
-		/opt/muos/script/system/network.sh connect
-	fi
-fi
-
 LOG_INFO "$0" 0 "BOOTING" "Checking Swap Requirements"
 /opt/muos/script/system/swap.sh &
 
