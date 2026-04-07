@@ -30,6 +30,13 @@ export HOME XDG_RUNTIME_DIR DBUS_SESSION_BUS_ADDRESS PIPEWIRE_RUNTIME_DIR \
 	LED_CONTROL_SCRIPT MUOS_RUN_DIR MUOS_SHARE_DIR MUOS_STORE_DIR \
 	OVERLAY_NOP IS_IDLE IDLE_STATE
 
+MUOS_CONF_GLOBAL="/opt/muos/config"
+MUOS_CONF_DEVICE="/opt/muos/device/config"
+MUOS_CONF_KIOSK="/opt/muos/kiosk"
+MUOS_CONF_SYSTEM="/opt/muos/config/system"
+
+export MUOS_CONF_GLOBAL MUOS_CONF_DEVICE MUOS_CONF_KIOSK MUOS_CONF_SYSTEM
+
 MESSAGE_EXEC="/opt/muos/frontend/muxmessage"
 MESSAGE_TEXT="/tmp/msg_livetext"
 MESSAGE_PROG="/tmp/msg_progress"
@@ -65,22 +72,30 @@ TBOX() {
 	/opt/muos/bin/toybox "$CMD" "$@"
 }
 
-GET_CONF_PATH() {
-	case "$1" in
-		global | config) echo "/opt/muos/config" ;;
-		device) echo "/opt/muos/device/config" ;;
-		kiosk) echo "/opt/muos/kiosk" ;;
-		system) echo "/opt/muos/config/system" ;;
-	esac
-}
-
 SET_VAR() {
-	BASE=$(GET_CONF_PATH "$1") || return 0
+	BASE=
+	case "$1" in
+		GLOBAL | global | CONFIG | config) BASE=$MUOS_CONF_GLOBAL ;;
+		DEVICE | device) BASE=$MUOS_CONF_DEVICE ;;
+		KIOSK | kiosk) BASE=$MUOS_CONF_KIOSK ;;
+		SYSTEM | system) BASE=$MUOS_CONF_SYSTEM ;;
+	esac
+
+	[ -n "$BASE" ] || return 0
+
 	printf "%s" "$3" >"$BASE/$2"
 }
 
 GET_VAR() {
-	BASE=$(GET_CONF_PATH "$1") || return 0
+	BASE=
+	case "$1" in
+		GLOBAL | global | CONFIG | config) BASE=$MUOS_CONF_GLOBAL ;;
+		DEVICE | device) BASE=$MUOS_CONF_DEVICE ;;
+		KIOSK | kiosk) BASE=$MUOS_CONF_KIOSK ;;
+		SYSTEM | system) BASE=$MUOS_CONF_SYSTEM ;;
+	esac
+
+	[ -n "$BASE" ] || return 0
 
 	FILE="$BASE/$2"
 	[ -r "$FILE" ] || return 0
