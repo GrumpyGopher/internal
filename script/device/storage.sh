@@ -34,10 +34,6 @@ if [ ! -b "/dev/$DEVICE" ] && [ -b "/dev/$DEV" ]; then
 	DEVICE="$DEV"
 fi
 
-PURGE_MOUNT() {
-	[ -d "$MOUNT_POINT" ] && rm -rf "$MOUNT_POINT"
-}
-
 MOUNTED() {
 	grep -qs " $MOUNT_POINT " /proc/mounts
 }
@@ -54,7 +50,7 @@ MOUNT_DEVICE() {
 		*) return 1 ;;
 	esac
 
-	mkdir -p "$MOUNT_POINT"
+	[ -d "$MOUNT_POINT" ] || mkdir -p "$MOUNT_POINT"
 
 	if mount -t "$FS_TYPE" -o "$FS_OPTS" "/dev/$DEVICE" "$MOUNT_POINT"; then
 		SET_VAR "device" "storage/$TYPE/active" "1"
@@ -88,17 +84,14 @@ MOUNT_DEVICE() {
 		return 0
 	fi
 
-	PURGE_MOUNT
 	return 1
 }
 
 UNMOUNT_DEVICE() {
 	sync
 
-	if umount "$MOUNT_POINT" 2>/dev/null ||
-		umount -l "$MOUNT_POINT" 2>/dev/null; then
+	if umount "$MOUNT_POINT" 2>/dev/null || umount -l "$MOUNT_POINT" 2>/dev/null; then
 		SET_VAR "device" "storage/$TYPE/active" "0"
-		PURGE_MOUNT
 		return 0
 	fi
 
