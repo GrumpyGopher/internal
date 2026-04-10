@@ -124,6 +124,6 @@ case "$1" in
 		;;
 	F) LCD_DISABLE && sleep 1 && LCD_ENABLE ;;
 	I) BRIGHT_INFO "$CURR_BRIGHT" ;;
-	[0-9]*) [ "$1" -eq "$1" ] 2>/dev/null && [ "$1" -ge 0 ] && [ "$1" -le "$MAX_BRIGHT" ] && SET_CURRENT "$1" ;;
+	[0-9]*) [ "$1" -eq "$1" ] 2>/dev/null && [ "$1" -ge 0 ] && [ "$1" -le "$MAX_BRIGHT" ] && SET_CURRENT "$1" 1 ;;
 	*) ;;
 esac

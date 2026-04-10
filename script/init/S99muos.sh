@@ -13,10 +13,6 @@ if [ "$FACTORY_RESET" -eq 1 ]; then
 	exit 0
 fi
 
-HAS_NETWORK=$(GET_VAR "device" "board/network")
-CONNECT_ON_BOOT=$(GET_VAR "config" "settings/network/boot")
-NET_ASYNC=$(GET_VAR "config" "settings/network/async_load")
-
 ROM_MOUNT=$(GET_VAR "device" "storage/rom/mount")
 SDCARD_MOUNT=$(GET_VAR "device" "storage/sdcard/mount")
 USB_MOUNT=$(GET_VAR "device" "storage/usb/mount")
