@@ -30,22 +30,9 @@ PROC_RUNNING() {
 	pgrep -x "$1" >/dev/null 2>&1
 }
 
-PROC_GONE() {
-	NAME=$1
-	ELAPSED=0
-
-	while PROC_RUNNING "$NAME"; do
-		sleep 0.1
-		ELAPSED=$((ELAPSED + INTERVAL))
-		[ "$ELAPSED" -ge "$TIMEOUT" ] && return 1
-	done
-
-	return 0
-}
-
 WAIT_UNTIL() {
 	COND_FN="$1"
-	ARG="${2:-}"
+	ARG="$2"
 	ELAPSED=0
 
 	while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
@@ -55,6 +42,13 @@ WAIT_UNTIL() {
 	done
 
 	return 1
+}
+
+WAIT_PROC_GONE() {
+	NAME=$1
+	WAIT_UNTIL PROC_RUNNING "$NAME" && return 1
+
+	return 0
 }
 
 RESTORE_CONF() {
@@ -92,28 +86,11 @@ GET_NODE_ID() {
 }
 
 NODE_VISIBLE() {
-	NODE_ID=$(GET_NODE_ID "$1")
-	[ -n "$NODE_ID" ]
+	[ -n "$(GET_NODE_ID "$1")" ]
 }
 
 DBUS_READY() {
 	[ -S "$DBUS_SOCKET" ]
-}
-
-GET_BOOT_RUNTIME_PERCENT() {
-	if [ "${BOOT_CONSOLE_MODE:-0}" -eq 1 ]; then
-		[ "${ADV_OD:-0}" -eq 1 ] && printf "200\n" || printf "100\n"
-		return 0
-	fi
-
-	ADV_VOL_TO_PERCENT "$ADV_VOL"
-}
-
-GET_BOOT_SAVED_VOLUME() {
-	case "$ADV_VOL" in
-		1 | 2 | 3) ADV_VOL_TO_PERCENT "$ADV_VOL" ;;
-		*) GET_SAVED_AUDIO_VOLUME ;;
-	esac
 }
 
 ADV_VOL_TO_PERCENT() {
@@ -121,6 +98,21 @@ ADV_VOL_TO_PERCENT() {
 		1) printf "0\n" ;;
 		2) printf "35\n" ;;
 		3) printf "%s\n" "$(GET_VAR "device" "audio/max")" ;;
+	esac
+}
+
+GET_BOOT_RUNTIME_PERCENT() {
+	if [ "${BOOT_CONSOLE_MODE:-0}" -eq 1 ]; then
+		[ "${ADV_OD:-0}" -eq 1 ] && printf "200\n" || printf "100\n"
+	else
+		ADV_VOL_TO_PERCENT "$ADV_VOL"
+	fi
+}
+
+GET_BOOT_SAVED_VOLUME() {
+	case "$ADV_VOL" in
+		1 | 2 | 3) ADV_VOL_TO_PERCENT "$ADV_VOL" ;;
+		*) GET_SAVED_AUDIO_VOLUME ;;
 	esac
 }
 
@@ -139,6 +131,15 @@ INSTALL_WIREPLUMBER_CONF() {
 	fi
 }
 
+STOP_PROC() {
+	NAME=$1
+
+	if PROC_RUNNING "$NAME"; then
+		pkill -15 -x "$NAME" 2>/dev/null
+		WAIT_PROC_GONE "$NAME" || pkill -9 -x "$NAME" 2>/dev/null
+	fi
+}
+
 START_PIPEWIRE() {
 	INSTALL_WIREPLUMBER_CONF
 
@@ -147,8 +148,7 @@ START_PIPEWIRE() {
 	else
 		if PROC_RUNNING pipewire; then
 			LOG_WARN "$0" 0 "PIPEWIRE" "PipeWire process exists but socket is not ready; restarting"
-			pkill -15 -x pipewire 2>/dev/null
-			PROC_GONE pipewire || pkill -9 -x pipewire 2>/dev/null
+			STOP_PROC pipewire
 		fi
 
 		LOG_INFO "$0" 0 "PIPEWIRE" "$(printf "Starting PipeWire (runtime: %s)" "$PIPEWIRE_RUNTIME_DIR")"
@@ -221,9 +221,7 @@ DO_START() {
 		exit 1
 	fi
 
-	if ! WAIT_UNTIL DBUS_READY; then
-		LOG_WARN "$0" 0 "PIPEWIRE" "D-Bus not ready after timeout; proceeding"
-	fi
+	WAIT_UNTIL DBUS_READY || LOG_WARN "$0" 0 "PIPEWIRE" "D-Bus not ready after timeout; proceeding"
 
 	if ! WAIT_UNTIL SOCKET_READY; then
 		LOG_WARN "$0" 0 "PIPEWIRE" "$(printf "PipeWire socket '%s' not ready after timeout" "$PW_SOCKET")"
@@ -252,15 +250,8 @@ DO_STOP() {
 		alsactl -U -f "$DEVICE_CONTROL_DIR/asound.state" store >/dev/null 2>&1
 	fi
 
-	if PROC_RUNNING wireplumber; then
-		pkill -15 -x wireplumber 2>/dev/null
-		PROC_GONE wireplumber || pkill -9 -x wireplumber 2>/dev/null
-	fi
-
-	if PROC_RUNNING pipewire; then
-		pkill -15 -x pipewire 2>/dev/null
-		PROC_GONE pipewire || pkill -9 -x pipewire 2>/dev/null
-	fi
+	STOP_PROC wireplumber
+	STOP_PROC pipewire
 
 	[ "${ADV_AR:-0}" -eq 1 ] && SET_VAR "device" "audio/ready" "0"
 	LOG_SUCCESS "$0" 0 "PIPEWIRE" "Audio shutdown complete"
