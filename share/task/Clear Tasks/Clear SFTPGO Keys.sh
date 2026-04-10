@@ -5,6 +5,8 @@
 # This script will remove the SFTPGO keys
 # These will be (re)generated on next boot.
 
+. /opt/muos/script/var/func.sh
+
 FRONTEND stop
 
 SFTP_DIR="/opt/sftpgo"
