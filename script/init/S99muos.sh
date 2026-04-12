@@ -14,8 +14,6 @@ if [ "$FACTORY_RESET" -eq 1 ]; then
 fi
 
 ROM_MOUNT=$(GET_VAR "device" "storage/rom/mount")
-SDCARD_MOUNT=$(GET_VAR "device" "storage/sdcard/mount")
-USB_MOUNT=$(GET_VAR "device" "storage/usb/mount")
 
 USB_FUNCTION=$(GET_VAR "config" "settings/advanced/usb_function")
 FIRST_INIT=$(GET_VAR "config" "boot/first_init")
@@ -38,15 +36,6 @@ FRONTEND start
 
 LOG_INFO "$0" 0 "BOOTING" "Checking Swap Requirements"
 /opt/muos/script/system/swap.sh &
-
-LOG_INFO "$0" 0 "BOOTING" "Precaching Content Mounts"
-(
-	for STORAGE_MOUNT in $ROM_MOUNT $SDCARD_MOUNT $USB_MOUNT; do
-		[ -d "$STORAGE_MOUNT/ROMS" ] || continue
-
-		nice -n 19 ionice -c3 find "$STORAGE_MOUNT/ROMS" -maxdepth 4 >/dev/null
-	done
-) &
 
 LOG_INFO "$0" 0 "BOOTING" "Storage Authenticity Check"
 /opt/muos/script/system/checkmsd.sh &
