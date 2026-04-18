@@ -159,11 +159,8 @@ FIND_PROCS() {
 	return 1
 }
 
-# Kill the lid switch process if it exists.
-if pgrep lid.sh >/dev/null 2>&1; then
-	LOG_INFO "$0" 0 "HALT" "Killing lid switch detection"
-	killall -q lid.sh
-fi
+LOG_INFO "$0" 0 "HALT" "Stopping muX services"
+MUXCTL stop
 
 # Avoid hangups from syncthing if it's running.
 LOG_INFO "$0" 0 "HALT" "Stopping Syncthing"
@@ -171,12 +168,6 @@ TERMINATE_SYNCTHING
 
 LOG_INFO "$0" 0 "HALT" "Stopping web services"
 /opt/muos/script/web/service.sh stopall >/dev/null 2>&1
-
-LOG_INFO "$0" 0 "HALT" "Stopping muX Hotkey Service"
-HOTKEY stop
-
-LOG_INFO "$0" 0 "HALT" "Stopping muX Frontend"
-FRONTEND stop
 
 if pgrep '^mux' >/dev/null 2>&1; then
 	LOG_INFO "$0" 0 "HALT" "Killing muX modules"

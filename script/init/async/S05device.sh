@@ -38,12 +38,7 @@ EMU_VER=
 
 case "$BOARD_NAME" in
 	rg-vita*) EMU_VER="vita" ;;
-	rg*)
-		EMU_VER="rg"
-		case "$BOARD_NAME" in
-			rg34xx-sp | rg35xx-sp) /opt/muos/script/device/lid.sh start & ;;
-		esac
-		;;
+	rg*) EMU_VER="rg" ;;
 	mgx* | tui*)
 		EMU_VER="tui"
 
