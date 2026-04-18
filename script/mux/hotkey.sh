@@ -56,8 +56,16 @@ LID_CLOSED() {
 SLEEP() {
 	IS_NORMAL_MODE || return 0
 
+	# Global caffeinated override
+	[ -f "$MUOS_RUN_DIR/caffeine" ] && return 0
+
 	# Prevent sleep immediately after resume
 	[ -f "$MUOS_RUN_DIR/recent_wake" ] && return 0
+
+	# Ignore if our lid switch is disabled
+	case "$(GET_VAR "device" "board/name")" in
+		rg34xx-sp | rg35xx-sp) [ "$(GET_VAR "config" "settings/advanced/lidswitch")" -eq 0 ] && return 0 ;;
+	esac
 
 	CURR_UPTIME=$(UPTIME 2>/dev/null)
 	CURR_UPTIME=${CURR_UPTIME%%.*}

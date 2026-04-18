@@ -365,6 +365,33 @@ BATTERY() {
 	esac
 }
 
+CAFFEINE() {
+	DRINK="$MUOS_RUN_DIR/caffeine"
+
+	case "${1:-}" in
+		on)
+			: >"$DRINK"
+			;;
+		off)
+			rm -f "$DRINK" 2>/dev/null
+			;;
+		toggle)
+			if [ -f "$DRINK" ]; then
+				rm -f "$DRINK" 2>/dev/null
+			else
+				: >"$DRINK"
+			fi
+			;;
+		status)
+			[ -f "$DRINK" ] && return 0 || return 1
+			;;
+		*)
+			printf "Usage: CAFFEINE on | off | toggle | status\n"
+			return 1
+			;;
+	esac
+}
+
 MUXCTL() {
 	case "$1" in
 		stop)
