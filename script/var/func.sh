@@ -1219,3 +1219,7 @@ RESTORE_CPU_GOV() {
 		printf "%s" "$GOV" >"$GOV_PATH"
 	fi
 }
+
+IS_MUTERM() {
+	[ "$(cat /proc/$PPID/comm 2>/dev/null)" = "muterm" ]
+}
