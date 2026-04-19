@@ -457,12 +457,34 @@ IP_STATIC() {
 	LOG_INFO "$0" 0 "NETWORK" "$(printf "Static config: %s/%s via %s dns %s" "$ADDR" "$CIDR" "$GATE" "$DNSA")"
 
 	ip addr flush dev "$IFCE"
-	ip route del default dev "$IFCE"
-	ip addr add "$ADDR"/"$SUBN" dev "$IFCE"
-	ip route add default via "$GATE" dev "$IFCE"
+	ip route del default dev "$IFCE" 2>/dev/null
+
+	if ! ip addr add "$ADDR"/"$CIDR" dev "$IFCE"; then
+		LOG_ERROR "$0" 0 "NETWORK" "Failed to assign static IP address"
+		FAIL_WITH "FAILED" "$RC_FAIL"
+		return $?
+	fi
+
+	if ! ip route add default via "$GATE" dev "$IFCE"; then
+		LOG_ERROR "$0" 0 "NETWORK" "Failed to add default route via gateway"
+		FAIL_WITH "FAILED" "$RC_FAIL"
+		return $?
+	fi
+
+	# Write DNS immediately for static configs so VALIDATE_NETWORK can ping
+	if [ -n "$DNSA" ]; then
+		[ -f "$RESOLV_CONF" ] && cp "$RESOLV_CONF" "$RESOLV_CONF.bak"
+		printf "nameserver %s\n" "$DNSA" >"$RESOLV_CONF"
+	fi
 
 	IP=$(ip -4 -o addr show dev "$IFCE" | awk '{print $4}' | cut -d/ -f1)
-	[ -n "$IP" ] || FAIL_WITH "FAILED" "$RC_FAIL"
+	if [ -z "$IP" ]; then
+		LOG_ERROR "$0" 0 "NETWORK" "Static IP assignment produced no address"
+		FAIL_WITH "FAILED" "$RC_FAIL"
+		return $?
+	fi
+
+	return 0
 }
 
 VALIDATE_NETWORK() {
