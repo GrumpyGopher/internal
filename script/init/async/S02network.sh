@@ -276,6 +276,30 @@ CALCULATE_IAID() {
 	LOG_INFO "$0" 0 "NETWORK" "$(printf "Using IAID: %s" "$IAID")"
 }
 
+MASK_TO_CIDR() {
+	MASK="$1"
+	case "$MASK" in
+		*.*.*.*) ;;
+		*)
+			printf "%s" "$MASK"
+			return
+			;;
+	esac
+
+	BITS=0
+	IFS=.
+	for OCTET in $MASK; do
+		VAL=$OCTET
+		while [ "$VAL" -gt 0 ]; do
+			BITS=$((BITS + (VAL & 1)))
+			VAL=$((VAL >> 1))
+		done
+	done
+	unset IFS
+
+	printf "%s" "$BITS"
+}
+
 WPA_RUNNING() {
 	pgrep -f "wpa_supplicant.*-i[[:space:]]*$IFCE" >/dev/null 2>&1 ||
 		pgrep -f "wpa_supplicant.*$IFCE" >/dev/null 2>&1
@@ -426,6 +450,11 @@ IP_DHCP() {
 
 IP_STATIC() {
 	NET_STATUS "WAITING_IP"
+
+	# Convert dotted subnet mask to CIDR prefix length if needed
+	# (e.g. 255.255.255.0 -> 24) so it accepts the address correctly
+	CIDR=$(MASK_TO_CIDR "$SUBN")
+	LOG_INFO "$0" 0 "NETWORK" "$(printf "Static config: %s/%s via %s dns %s" "$ADDR" "$CIDR" "$GATE" "$DNSA")"
 
 	ip addr flush dev "$IFCE"
 	ip route del default dev "$IFCE"
