@@ -8,29 +8,53 @@ USAGE() {
 }
 
 # Attempts to cleanly close the current foreground process, resuming it first
-# if it's stopped. Waits ten seconds before giving up.
+# if it's stopped. Sends SIGTERM and waits TERM_GRACE_SEC before escalating
+# to SIGKILL, then waits up to KILL_WAIT_SEC for the process to actually exit.
+
+TERM_GRACE_SEC=3
+KILL_WAIT_SEC=7
+
 CLOSE_CONTENT() {
 	FG_PROC_VAL=$(GET_VAR "system" "foreground_process")
-	FG_PROC_PID="$(pidof "$FG_PROC_VAL")"
+	[ -z "$FG_PROC_VAL" ] && return 0
 
-	if [ -n "$FG_PROC_PID" ]; then
-		LOG_INFO "$0" 0 "QUIT" "$(printf "Closing content (%s)..." "$FG_PROC_VAL")"
+	FG_PROC_PID="$(pidof "$FG_PROC_VAL" 2>/dev/null)"
+	[ -z "$FG_PROC_PID" ] && return 0
 
-		kill -CONT "$FG_PROC_PID" 2>/dev/null
+	LOG_INFO "$0" 0 "QUIT" "$(printf "Closing content (%s)..." "$FG_PROC_VAL")"
+
+	# Resume the process in case it is suspended, then ask it to exit cleanly.
+	kill -CONT "$FG_PROC_PID" 2>/dev/null
+	sleep 0.1
+	kill -TERM "$FG_PROC_PID" 2>/dev/null
+
+	# Wait for TERM to take effect before escalating.
+	_I=0
+	while [ "$_I" -lt "$((TERM_GRACE_SEC * 10))" ]; do
+		kill -0 "$FG_PROC_PID" 2>/dev/null || {
+			LOG_INFO "$0" 0 "QUIT" "$(printf "Exited cleanly (%s)" "$FG_PROC_VAL")"
+			return 0
+		}
 		sleep 0.1
-		kill -TERM "$FG_PROC_PID" 2>/dev/null
+		_I=$((_I + 1))
+	done
 
-		_I=0
-		while [ "$_I" -lt 40 ]; do
-			if ! kill -KILL "$FG_PROC_PID" 2>/dev/null; then
-				LOG_INFO "$0" 0 "QUIT" "$(printf "Killed (%s)..." "$FG_PROC_VAL")"
-				return
-			fi
+	# Process did not respond to SIGTERM — escalate to SIGKILL.
+	LOG_INFO "$0" 0 "QUIT" "$(printf "Escalating to SIGKILL (%s)..." "$FG_PROC_VAL")"
 
-			sleep 0.1
-			_I=$((_I + 1))
-		done
-	fi
+	_I=0
+	while [ "$_I" -lt "$((KILL_WAIT_SEC * 10))" ]; do
+		kill -0 "$FG_PROC_PID" 2>/dev/null || {
+			LOG_INFO "$0" 0 "QUIT" "$(printf "Killed (%s)" "$FG_PROC_VAL")"
+			return 0
+		}
+		kill -KILL "$FG_PROC_PID" 2>/dev/null
+		sleep 0.1
+		_I=$((_I + 1))
+	done
+
+	LOG_INFO "$0" 0 "QUIT" "$(printf "Process did not die (%s)" "$FG_PROC_VAL")"
+
 }
 
 # Blank screen to prevent visual glitches as running programs exit.
@@ -74,7 +98,7 @@ HALT_SYSTEM() {
 	# that was started via the launch script.
 	case "$(GET_VAR "config" "settings/general/startup")" in
 		last) ;;
-		resume) pidof launch.sh >/dev/null || CLEAR_LAST_PLAY ;;
+		resume) pidof launch.sh >/dev/null 2>&1 || CLEAR_LAST_PLAY ;;
 		*) CLEAR_LAST_PLAY ;;
 	esac
 

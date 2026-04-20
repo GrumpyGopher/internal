@@ -45,7 +45,7 @@ Backends:
 
 SYSFS:
   Modes      : 1=static, 2=breath fast, 3=breath med, 4=breath slow, 5=blink1, 6=blink2, 7=blink3, 8=linear, 9=sniff
-  Brightness : 0–60 (clamped)
+  Brightness : 0-60 (clamped)
   Args:
     <L_r> <L_g> <L_b> [<R_r> <R_g> <R_b>] [M_r M_g M_b] [F1_r F1_g F1_b] [F2_r F2_g F2_b]
   Options:
@@ -54,10 +54,10 @@ SYSFS:
 
 SERIAL:
   Modes      : 1=solid, 2=breath fast, 3=breath med, 4=breath slow, 5=mono rainbow, 6=multi rainbow
-  Brightness : 0–255 (clamped)
+  Brightness : 0-255 (clamped)
   Mode 1     : <right_r> <right_g> <right_b> <left_r> <left_g> <left_b>
-  Modes 2–4  : <r> <g> <b>
-  Modes 5–6  : <speed 0–255>
+  Modes 2-4  : <r> <g> <b>
+  Modes 5-6  : <speed 0-255>
   Randomise  : use service:  $0 service start [-b serial|auto] 1 <brightness> random [interval_ms]"
 }
 
@@ -255,7 +255,7 @@ APPLY_SYSFS() {
 	shift 2
 
 	case "$MODE" in 1 | 2 | 3 | 4 | 5 | 6 | 7) : ;; *)
-		printf "Invalid mode for SYSFS: %s (1–7)\n" "$MODE" >&2
+		printf "Invalid mode for SYSFS: %s (1-7)\n" "$MODE" >&2
 		exit 1
 		;;
 	esac
@@ -414,7 +414,7 @@ APPLY_SERIAL() {
 	shift 2
 
 	case "$MODE" in 1 | 2 | 3 | 4 | 5 | 6) : ;; *)
-		printf "Invalid mode for SERIAL: %s (1–6)\n" "$MODE" >&2
+		printf "Invalid mode for SERIAL: %s (1-6)\n" "$MODE" >&2
 		exit 1
 		;;
 	esac
@@ -424,7 +424,7 @@ APPLY_SERIAL() {
 
 	if [ "$MODE" -ge 5 ] && [ "$MODE" -le 6 ]; then
 		[ $# -eq 1 ] || {
-			printf "SERIAL usage (5–6): %s -b serial <5|6> <brightness> <speed 0-255>\n" "$0" >&2
+			printf "SERIAL usage (5-6): %s -b serial <5|6> <brightness> <speed 0-255>\n" "$0" >&2
 			exit 1
 		}
 
@@ -483,7 +483,7 @@ APPLY_SERIAL() {
 		printf "LED mode %s set with brightness %s (SERIAL)\n" "$MODE" "$BRI"
 	else
 		[ $# -eq 3 ] || {
-			printf "SERIAL usage (2–4): %s -b serial <2|3|4> <brightness> <r> <g> <b>\n" "$0" >&2
+			printf "SERIAL usage (2-4): %s -b serial <2|3|4> <brightness> <r> <g> <b>\n" "$0" >&2
 			exit 1
 		}
 

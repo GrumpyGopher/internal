@@ -59,39 +59,84 @@ RUN_WITH_TIMEOUT() {
 
 	printf 'Running %s...\n' "$DESCRIPTION"
 
+	"$@" &
+	CMD_PID=$!
+
 	(
-		"$@" &
-		CMD_PID=$!
-		(
-			sleep "$TERM_SEC"
+		sleep "$TERM_SEC"
+		if kill -0 "$CMD_PID" 2>/dev/null; then
 			kill -TERM "$CMD_PID" 2>/dev/null
-		) &
-		TERM_PID=$!
-		(
-			sleep $((TERM_SEC + KILL_SEC))
+			sleep "$KILL_SEC"
 			kill -KILL "$CMD_PID" 2>/dev/null
-		) &
-		KILL_PID=$!
-
-		wait "$CMD_PID"
-		STATUS=$?
-
-		kill -0 "$TERM_PID" 2>/dev/null && kill "$TERM_PID" >/dev/null 2>&1
-		kill -0 "$KILL_PID" 2>/dev/null && kill "$KILL_PID" >/dev/null 2>&1
-
-		if [ "$STATUS" -gt 128 ]; then
-			printf 'Killed %s after timeout\n' "$DESCRIPTION"
 		fi
-		exit "$STATUS"
-	)
-	return $?
+	) &
+	WATCHDOG_PID=$!
+
+	wait "$CMD_PID"
+	STATUS=$?
+
+	# Cancel the watchdog if the command already exited cleanly.
+	kill "$WATCHDOG_PID" 2>/dev/null
+	wait "$WATCHDOG_PID" 2>/dev/null
+
+	if [ "$STATUS" -gt 128 ]; then
+		printf 'Killed %s after timeout\n' "$DESCRIPTION"
+	fi
+
+	return "$STATUS"
+
+}
+
+# Prints a space-separated list of running process command names using the same
+# criteria as killall5. Returns success if at least one such process is found.
+#
+# Usage: FIND_PROCS [-o OMIT_PID]...
+FIND_PROCS() {
+	CURRENT_SID=$(cut -d ' ' -f 6 /proc/self/stat)
+	OMIT_PIDS=""
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+			-o)
+				shift
+				OMIT_PIDS="$OMIT_PIDS $1"
+				shift
+				;;
+			*) shift ;;
+		esac
+	done
+
+	_FIND_PROCS_TMP=$(mktemp) || return 1
+
+	ps -eo pid=,sid=,comm= | while read -r PID SID COMM; do
+		[ "$PID" -eq 1 ] && continue
+		[ "$SID" -eq 0 ] && continue
+		[ "$SID" -eq "$CURRENT_SID" ] && continue
+
+		for O in $OMIT_PIDS; do
+			[ "$PID" -eq "$O" ] && continue 2
+		done
+
+		printf '%s ' "$COMM" >>"$_FIND_PROCS_TMP"
+	done
+
+	FOUND=$(cat "$_FIND_PROCS_TMP")
+	rm -f "$_FIND_PROCS_TMP"
+
+	[ -n "$FOUND" ] && {
+		printf '%s\n' "$FOUND"
+		return 0
+	}
+
+	return 1
+
 }
 
 # Sends the specified termination signal to every process outside the current
 # session, then waits the specified number of seconds for those processes to
-# exit. Rechecks every 250ms to see if they've all died yet.
+# exit. Rechecks every 250ms to see if they have all died yet.
 #
 # Usage: KILL_AND_WAIT TIMEOUT_SEC SIGNAL [-o OMIT_PID]...
+
 KILL_AND_WAIT() {
 	TIMEOUT_SEC=$1
 	SIGNAL=$2
@@ -116,47 +161,7 @@ KILL_AND_WAIT() {
 
 	printf 'timed out\nStill running: %s\n' "$PROCS"
 	return 1
-}
 
-# Prints a space-separated list of running process command names using the same
-# criteria as killall5. Returns success if at least one such process is found.
-#
-# Usage: FIND_PROCS [-o OMIT_PID]...
-FIND_PROCS() {
-	CURRENT_SID=$(cut -d ' ' -f 6 /proc/self/stat)
-	OMIT_PIDS=""
-	while [ "$#" -gt 0 ]; do
-		case "$1" in
-			-o)
-				shift
-				OMIT_PIDS="$OMIT_PIDS $1"
-				shift
-				;;
-			*) shift ;;
-		esac
-	done
-
-	FOUND=""
-	ps -eo pid=,sid=,comm= | while read -r PID SID COMM; do
-		[ "$PID" -eq 1 ] && continue
-		[ "$SID" -eq 0 ] && continue
-		[ "$SID" -eq "$CURRENT_SID" ] && continue
-
-		for O in $OMIT_PIDS; do
-			[ "$PID" -eq "$O" ] && continue 2
-		done
-
-		# shellcheck disable=SC2030
-		FOUND="${FOUND:+$FOUND }$COMM"
-	done
-
-	# shellcheck disable=SC2031
-	[ -n "$FOUND" ] && {
-		echo "$FOUND"
-		return 0
-	}
-
-	return 1
 }
 
 LOG_INFO "$0" 0 "HALT" "Stopping muX services"
@@ -181,19 +186,6 @@ if pgrep '^mux' >/dev/null 2>&1; then
 		sleep 0.1
 	done
 fi
-
-if [ "$(GET_VAR "device" "board/network")" -eq 1 ]; then
-	LOG_INFO "$0" 0 "HALT" "Stopping Network"
-	/opt/muos/script/init/async/S02network.sh stop
-fi
-
-LOG_INFO "$0" 0 "HALT" "Stopping Pipewire"
-/opt/muos/script/system/pipewire.sh stop
-
-# Unmount SD2 and USB - we do USB first as it is the higher priority!
-LOG_INFO "$0" 0 "HALT" "Stopping external storage mounts"
-/opt/muos/script/device/storage.sh "usb" "down"
-/opt/muos/script/device/storage.sh "sdcard" "down"
 
 # Check if random theme is enabled and run the random theme script if necessary
 if [ "$(GET_VAR "config" "settings/advanced/random_theme")" -eq 1 ] 2>/dev/null; then

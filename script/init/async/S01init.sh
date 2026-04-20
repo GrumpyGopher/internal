@@ -8,47 +8,74 @@ DEBUG_FS=$(GET_VAR "device" "board/debugfs")
 WIDTH=$(GET_VAR "device" "screen/internal/width")
 HEIGHT=$(GET_VAR "device" "screen/internal/height")
 
-sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
+DO_START() {
+	sed -i -E "s/(defaults\.(ctl|pcm)\.card) [0-9]+/\1 0/g" /usr/share/alsa/alsa.conf
 
-LOG_INFO "$0" 0 "BOOTING" "Creating Required Run Directory"
-mkdir -p "$MUOS_RUN_DIR"
+	LOG_INFO "$0" 0 "BOOTING" "Creating Required Run Directory"
+	mkdir -p "$MUOS_RUN_DIR"
 
-LOG_INFO "$0" 0 "BOOTING" "Setting 'performance' Governor"
-printf "performance" >"$GOVERNOR"
+	LOG_INFO "$0" 0 "BOOTING" "Setting 'performance' Governor"
+	printf "performance" >"$GOVERNOR"
 
-[ -f "$LED_CONTROL_SCRIPT" ] && "$LED_CONTROL_SCRIPT" 1 0 0 0 0 0 0 0
+	[ -f "$LED_CONTROL_SCRIPT" ] && "$LED_CONTROL_SCRIPT" 1 0 0 0 0 0 0 0
 
-[ "$DEBUG_FS" -eq 1 ] && mount -t debugfs debugfs /sys/kernel/debug
+	[ "$DEBUG_FS" -eq 1 ] && mount -t debugfs debugfs /sys/kernel/debug
 
-/opt/muos/script/device/module.sh load
+	/opt/muos/script/device/module.sh load
 
-[ "$FACTORY_RESET" -eq 1 ] && /opt/muos/frontend/muxwarn &
+	[ "$FACTORY_RESET" -eq 1 ] && /opt/muos/frontend/muxwarn &
 
-mkdir -p "/tmp/muos"
-rm -rf "$MUOS_LOG_DIR"/*.log "/opt/muxtmp"
+	mkdir -p "/tmp/muos"
+	rm -rf "$MUOS_LOG_DIR"/*.log "/opt/muxtmp"
 
-IFS= read -r MU_UPTIME _ </proc/uptime
+	IFS= read -r MU_UPTIME _ </proc/uptime
 
-SET_VAR "system" "resume_uptime" "$MU_UPTIME"
-SET_VAR "system" "idle_inhibit" "0"
-SET_VAR "config" "boot/device_mode" "0"
-SET_VAR "device" "audio/ready" "0"
+	SET_VAR "system" "resume_uptime" "$MU_UPTIME"
+	SET_VAR "system" "idle_inhibit" "0"
+	SET_VAR "config" "boot/device_mode" "0"
+	SET_VAR "device" "audio/ready" "0"
 
-(
-	SET_VAR "device" "screen/width" "$WIDTH"
-	SET_VAR "device" "screen/height" "$HEIGHT"
-	SET_VAR "device" "mux/width" "$WIDTH"
-	SET_VAR "device" "mux/height" "$HEIGHT"
-) &
+	(
+		SET_VAR "device" "screen/width" "$WIDTH"
+		SET_VAR "device" "screen/height" "$HEIGHT"
+		SET_VAR "device" "mux/width" "$WIDTH"
+		SET_VAR "device" "mux/height" "$HEIGHT"
+	) &
 
-LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
-/opt/muos/script/system/os_release.sh &
+	LOG_INFO "$0" 0 "BOOTING" "Setting OS Release"
+	/opt/muos/script/system/os_release.sh &
 
-printf "1" >"$MUOS_RUN_DIR/work_led_state"
-: >"$MUOS_RUN_DIR/net_start"
+	printf "1" >"$MUOS_RUN_DIR/work_led_state"
+	: >"$MUOS_RUN_DIR/net_start"
 
-LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
-BATTERY start
+	LOG_INFO "$0" 0 "BOOTING" "Starting Battery Watchdog"
+	BATTERY start
 
-LOG_INFO "$0" 0 "BOOTING" "Reset temporary screen rotation and zoom"
-rm -f "/opt/muos/device/config/screen/s_rotate" "/opt/muos/device/config/screen/s_zoom" &
+	LOG_INFO "$0" 0 "BOOTING" "Reset temporary screen rotation and zoom"
+	rm -f "/opt/muos/device/config/screen/s_rotate" "/opt/muos/device/config/screen/s_zoom" &
+}
+
+DO_STOP() {
+	BATTERY stop
+
+	[ "$DEBUG_FS" -eq 1 ] && umount /sys/kernel/debug 2>/dev/null
+
+	/opt/muos/script/device/module.sh unload
+}
+
+case "$1" in
+	start)
+		DO_START
+		;;
+	stop)
+		DO_STOP
+		;;
+	restart)
+		DO_STOP
+		DO_START
+		;;
+	*)
+		printf "Usage: %s {start|stop|restart}\n" "$0" >&2
+		exit 1
+		;;
+esac

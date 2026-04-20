@@ -10,50 +10,6 @@ THERMAL=$(GET_VAR "config" "settings/advanced/thermal")
 
 BOARD_NAME=$(GET_VAR "device" "board/name")
 
-(
-	if [ "$OVERDRIVE" -eq 1 ]; then
-		SET_VAR "device" "audio/max" "200"
-	else
-		SET_VAR "device" "audio/max" "100"
-	fi
-) &
-
-(
-	if [ "$THERMAL" -eq 0 ]; then
-		for ZONE in /sys/class/thermal/thermal_zone*; do
-			[ -e "$ZONE/mode" ] && printf "disabled" >"$ZONE/mode"
-		done
-	fi
-) &
-
-rfkill unblock all 2>/dev/null
-
-# Swap the speaker audio if set
-/opt/muos/script/device/speaker.sh &
-
-# Calibrate user setting joystick values if set
-/opt/muos/script/device/joycal.sh &
-
-EMU_VER=
-
-case "$BOARD_NAME" in
-	rg-vita*) EMU_VER="vita" ;;
-	rg*) EMU_VER="rg" ;;
-	mgx* | tui*)
-		EMU_VER="tui"
-
-		# Create TrimUI Input folder
-		mkdir -p "/tmp/trimui_inputd"
-
-		# Modified GPU parameters
-		echo 0 >/sys/module/pvrsrvkm/parameters/PVRDebugLevel
-
-		# Some stupid TrimUI GPU shenanigans
-		setalpha 0
-		;;
-	rk*) EMU_VER="rk" ;;
-esac
-
 # Install a flat binary if its MD5 differs from the installed copy.
 INSTALL_BIN() {
 	SRC_BIN="$1"
@@ -105,11 +61,73 @@ INSTALL_ARCHIVE() {
 	rm -rf "$_INST_TMP"
 }
 
-RA_DIR="$MUOS_SHARE_DIR/emulator/retroarch"
-INSTALL_BIN "$RA_DIR/retroarch-${EMU_VER}" "$RA_DIR/retroarch-${EMU_VER}.md5" "/usr/bin/retroarch" &
+DO_START() {
+	(
+		if [ "$OVERDRIVE" -eq 1 ]; then
+			SET_VAR "device" "audio/max" "200"
+		else
+			SET_VAR "device" "audio/max" "100"
+		fi
+	) &
 
-PPSSPP_DIR="$MUOS_SHARE_DIR/emulator/ppsspp"
-INSTALL_ARCHIVE "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.tar.gz" "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.md5" "$PPSSPP_DIR" "PPSSPP-*" "${PPSSPP_DIR}/PPSSPP" &
+	(
+		if [ "$THERMAL" -eq 0 ]; then
+			for ZONE in /sys/class/thermal/thermal_zone*; do
+				[ -e "$ZONE/mode" ] && printf "disabled" >"$ZONE/mode"
+			done
+		fi
+	) &
 
-SCUMMVM_DIR="$MUOS_SHARE_DIR/emulator/scummvm"
-INSTALL_ARCHIVE "${SCUMMVM_DIR}/scummvm-${EMU_VER}.tar.gz" "${SCUMMVM_DIR}/scummvm-${EMU_VER}.md5" "$SCUMMVM_DIR" "scummvm-*" "${SCUMMVM_DIR}/scummvm" &
+	rfkill unblock all 2>/dev/null
+
+	# Swap the speaker audio if set
+	/opt/muos/script/device/speaker.sh &
+
+	# Calibrate user setting joystick values if set
+	/opt/muos/script/device/joycal.sh &
+
+	EMU_VER=
+
+	case "$BOARD_NAME" in
+		rg-vita*) EMU_VER="vita" ;;
+		rg*) EMU_VER="rg" ;;
+		mgx* | tui*)
+			EMU_VER="tui"
+
+			# Create TrimUI Input folder
+			mkdir -p "/tmp/trimui_inputd"
+
+			# Modified GPU parameters
+			echo 0 >/sys/module/pvrsrvkm/parameters/PVRDebugLevel
+
+			# Some stupid TrimUI GPU shenanigans
+			setalpha 0
+			;;
+		rk*) EMU_VER="rk" ;;
+	esac
+
+	RA_DIR="$MUOS_SHARE_DIR/emulator/retroarch"
+	INSTALL_BIN "$RA_DIR/retroarch-${EMU_VER}" "$RA_DIR/retroarch-${EMU_VER}.md5" "/usr/bin/retroarch" &
+
+	PPSSPP_DIR="$MUOS_SHARE_DIR/emulator/ppsspp"
+	INSTALL_ARCHIVE "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.tar.gz" "${PPSSPP_DIR}/PPSSPP-${EMU_VER}.md5" "$PPSSPP_DIR" "PPSSPP-*" "${PPSSPP_DIR}/PPSSPP" &
+
+	SCUMMVM_DIR="$MUOS_SHARE_DIR/emulator/scummvm"
+	INSTALL_ARCHIVE "${SCUMMVM_DIR}/scummvm-${EMU_VER}.tar.gz" "${SCUMMVM_DIR}/scummvm-${EMU_VER}.md5" "$SCUMMVM_DIR" "scummvm-*" "${SCUMMVM_DIR}/scummvm" &
+}
+
+case "$1" in
+	start)
+		DO_START
+		;;
+	stop)
+		# Hardware state set during start is not reversible at runtime
+		;;
+	restart)
+		DO_START
+		;;
+	*)
+		printf "Usage: %s {start|stop|restart}\n" "$0" >&2
+		exit 1
+		;;
+esac
