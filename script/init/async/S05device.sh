@@ -80,6 +80,9 @@ DO_START() {
 
 	rfkill unblock all 2>/dev/null
 
+	# Adjust headphone output for certain devices
+	/opt/muos/script/device/headphone.sh &
+
 	# Swap the speaker audio if set
 	/opt/muos/script/device/speaker.sh &
 
