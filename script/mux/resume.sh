@@ -11,6 +11,7 @@ CON_GO="/tmp/con_go"
 FLT_GO="/tmp/flt_go"
 RAC_GO="/tmp/rac_go"
 ROM_GO="/tmp/rom_go"
+SHD_GO="/tmp/shd_go"
 
 NET_START="$MUOS_RUN_DIR/net_start"
 
@@ -76,7 +77,7 @@ if [ -n "$LAST_PLAY" ]; then
 		BASE="$(basename "$LAST_PLAY" .cfg)"
 		DIR="$(dirname "$LAST_PLAY")"
 
-		for TYPE in "governor" "control" "retroarch" "filter"; do
+		for TYPE in "governor" "control" "retroarch" "filter" "shader"; do
 			case "$TYPE" in
 				"governor")
 					CONTENT_FILE="${DIR}/${BASE}.gov"
@@ -97,6 +98,11 @@ if [ -n "$LAST_PLAY" ]; then
 					CONTENT_FILE="${DIR}/${BASE}.flt"
 					FALLBACK_FILE="${DIR}/core.flt"
 					OUTPUT_FILE="$FLT_GO"
+					;;
+				"shader")
+					CONTENT_FILE="${DIR}/${BASE}.shd"
+					FALLBACK_FILE="${DIR}/core.shd"
+					OUTPUT_FILE="$SHD_GO"
 					;;
 			esac
 

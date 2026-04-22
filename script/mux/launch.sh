@@ -32,6 +32,7 @@ GOV_GO="/tmp/gov_go"
 SAA_GO="/tmp/saa_go"
 SAG_GO="/tmp/sag_go"
 SAR_GO="/tmp/sar_go"
+SHD_GO="/tmp/shd_go"
 
 {
 	read -r NAME
@@ -73,6 +74,9 @@ ENSURE_REMOVED "$SAR_GO"
 
 # Set the chosen colour filter of content to our stage overlay path.
 cat "$FLT_GO" >"$MUOS_RUN_DIR/overlay.filter"
+
+# Set the chosen shader of content.
+cat "$SHD_GO" >"$MUOS_RUN_DIR/overlay.shader"
 
 # Construct the path to the assigned launcher INI file based on device storage,
 # assignment name ($ASSIGN), and launcher name ($LAUNCH).  This is created within
@@ -133,6 +137,7 @@ ENSURE_REMOVED "$CON_GO"
 ENSURE_REMOVED "$FLT_GO"
 ENSURE_REMOVED "$OVL_GO"
 ENSURE_REMOVED "$RAC_GO"
+ENSURE_REMOVED "$SHD_GO"
 
 ENSURE_REMOVED "$MUOS_RUN_DIR/overlay.filter"
 ENSURE_REMOVED "$MUOS_RUN_DIR/overlay.shader"

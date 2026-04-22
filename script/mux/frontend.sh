@@ -19,6 +19,7 @@ ROM_GO="/tmp/rom_go"
 SAA_GO="/tmp/saa_go"
 SAG_GO="/tmp/sag_go"
 SAR_GO="/tmp/sar_go"
+SHD_GO="/tmp/shd_go"
 
 EX_CARD="/tmp/explore_card"
 
@@ -90,6 +91,7 @@ while :; do
 			ENSURE_REMOVED "$GOV_GO"
 			ENSURE_REMOVED "$CON_GO"
 			ENSURE_REMOVED "$FLT_GO"
+			ENSURE_REMOVED "$SHD_GO"
 			ENSURE_REMOVED "$RAC_GO"
 
 			LOG_INFO "$0" 0 "FRONTEND" "Clearing Auto Assign flags"
